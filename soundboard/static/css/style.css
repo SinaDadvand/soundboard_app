@@ -1,0 +1,77 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #00ff88;
+}
+
+.soundboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.sound-button {
+    background-color: #2a2a2a;
+    border: 2px solid #00ff88;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.sound-button:hover {
+    background-color: #3a3a3a;
+    transform: scale(1.05);
+}
+
+.sound-button.active {
+    background-color: #00ff88;
+    color: #1a1a1a;
+}
+
+.sound-name {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.key-hint {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.instructions {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 2rem;
+}
+
+.instructions h2 {
+    color: #00ff88;
+    margin-bottom: 1rem;
+}
+
+.instructions p {
+    margin-bottom: 0.5rem;
+}

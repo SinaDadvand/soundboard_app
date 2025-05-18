@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Soundboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Virtual Soundboard</h1>
+        <div class="soundboard" id="soundboard">
+            {% for audio in audio_files %}
+            <div class="sound-button" data-sound="{{ audio }}">
+                <span class="sound-name">{{ audio.split('.')[0] }}</span>
+                <small class="key-hint"></small>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="instructions">
+            <h2>Instructions</h2>
+            <p>Click on buttons or use keyboard shortcuts to play sounds.</p>
+            <p>Default shortcuts are number keys (1-9)</p>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/soundboard.js') }}"></script>
+</body>
+</html>
