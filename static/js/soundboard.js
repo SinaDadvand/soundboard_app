@@ -1,34 +1,21 @@
 document.addEventListener('DOMContentLoaded', () => {
     const soundButtons = document.querySelectorAll('.sound-button');
-    let currentlyPlaying = null;
 
-    // Function to play sound through the server endpoint
-    async function playSound(button) {
-        const soundFile = button.dataset.sound;
-        
-        // Remove active class from previous button if any
-        if (currentlyPlaying) {
-            currentlyPlaying.classList.remove('active');
-        }
-
-        // Play new sound through server endpoint
-        try {
-            const response = await fetch(`/play/${soundFile}`);
-            if (response.ok) {
-                button.classList.add('active');
-                currentlyPlaying = button;
-                
-                // Remove active class after 1 second
-                setTimeout(() => {
-                    button.classList.remove('active');
-                    if (currentlyPlaying === button) {
-                        currentlyPlaying = null;
-                    }
-                }, 1000);
-            }
-        } catch (error) {
-            console.error('Error playing sound:', error);
-        }
+    // Function to play sound and show visual feedback
+    function playSound(button) {
+        // Make API call to play the sound
+        fetch(`/play/${button.dataset.sound}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Add visual feedback
+                    button.classList.add('active');
+                    setTimeout(() => {
+                        button.classList.remove('active');
+                    }, 200);
+                }
+            })
+            .catch(error => console.error('Error:', error));
     }
 
     // Click event listeners

@@ -9,19 +9,18 @@
 <body>
     <div class="container">
         <h1>Virtual Soundboard</h1>
-        <div class="soundboard" id="soundboard">
+        <div class="soundboard numpad-layout" id="soundboard">
             {% for audio in audio_files %}
             <div class="sound-button" data-sound="{{ audio.filename }}">
-                <span class="sound-name">{{ audio.filename.split('.')[0] }}</span>
-                {% if audio.hotkey %}
-                <small class="key-hint">[{{ audio.hotkey }}]</small>
-                {% endif %}
+                <span class="sound-name">{{ audio.name }}</span>
+                <small class="key-hint">[{{ audio.symbol }}]</small>
             </div>
             {% endfor %}
         </div>
         <div class="instructions">
             <h2>Instructions</h2>
-            <p>Click on buttons to play sounds in the browser, or use the assigned hotkeys to play sounds from any application.</p>
+            <p>Click on buttons to play sounds in the browser.</p>
+            <p>Use the numpad keys to play sounds from any application.</p>
             <p>Hotkeys will work even when this window is not focused.</p>
         </div>
     </div>

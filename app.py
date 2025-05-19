@@ -18,17 +18,29 @@ pygame.mixer.init()
 sounds = {}
 
 def load_sounds():
-    """Load all sound files and assign default hotkeys"""
-    hotkey_base = ['num 1', 'num 2', 'num 3', 'num 4', 'num 5', 'num 6', 'num 7', 'num 8', 'num 9', 'num 0', 'num /', 'num *', 'num -', 'num +', 'num .']
-    for filename in os.listdir(AUDIO_FOLDER):
-        if filename.endswith(('.mp3', '.wav', '.ogg')):
+    """Load all sound files and assign default hotkeys in numpad order"""    # Define numpad layout order with symbols (in visual order)
+    numpad_keys = [
+        ('7', '7'), ('8', '8'), ('9', '9'), ('/', '/'),
+        ('4', '4'), ('5', '5'), ('6', '6'), ('*', '*'),
+        ('1', '1'), ('2', '2'), ('3', '3'), ('-', '-'),
+        ('0', '0'), ('.', '.'), ('+', '+')
+    ]
+    
+    # Get all audio files and sort them
+    audio_files = [f for f in os.listdir(AUDIO_FOLDER) if f.endswith(('.mp3', '.wav', '.ogg'))]
+    audio_files.sort()  # Sort alphabetically first
+    
+    # Map files to hotkeys
+    for i, filename in enumerate(audio_files):
+        if i < len(numpad_keys):
             filepath = os.path.join(AUDIO_FOLDER, filename)
             sound = pygame.mixer.Sound(filepath)
-            # Assign a hotkey if we haven't run out of default hotkeys
-            hotkey = hotkey_base.pop(0) if hotkey_base else None
+            hotkey, symbol = numpad_keys[i]
             sounds[filename] = {
                 'sound': sound,
-                'hotkey': hotkey
+                'hotkey': hotkey,
+                'symbol': symbol,
+                'order': i  # Add order for sorting in template
             }
 
 def play_sound(filename):
@@ -51,11 +63,13 @@ def start_keyboard_listener():
 
 @app.route('/')
 def index():
-    # Get list of audio files with their hotkeys
+    # Get list of audio files with their hotkeys and symbols, sorted by numpad order
     audio_files = [{
         'filename': filename,
-        'hotkey': data['hotkey']
-    } for filename, data in sounds.items()]
+        'hotkey': data['hotkey'],
+        'symbol': data['symbol'],
+        'name': filename.split('.')[0]
+    } for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order'])]
     return render_template('index.html', audio_files=audio_files)
 
 @app.route('/audio/<path:filename>')
@@ -74,9 +88,9 @@ if __name__ == '__main__':
     setup_hotkeys()
     start_keyboard_listener()
     print("\nHotkey mappings:")
-    for filename, data in sounds.items():
+    for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order']):
         if data['hotkey']:
-            print(f"{filename}: {data['hotkey']}")
+            print(f"{filename}: Numpad {data['symbol']}")
     print("\nAccess the web interface at http://localhost:5000")
     print("The soundboard will respond to hotkeys even when the browser is not focused")
     print("=" * 25)

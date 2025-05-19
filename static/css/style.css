@@ -11,7 +11,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 800px;
     margin: 0 auto;
     padding: 2rem;
 }
@@ -24,9 +24,12 @@ h1 {
 
 .soundboard {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
     margin-bottom: 2rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .sound-button {
@@ -41,6 +44,7 @@ h1 {
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+    min-height: 80px;
 }
 
 .sound-button:hover {
@@ -54,25 +58,26 @@ h1 {
 }
 
 .sound-name {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-size: 1.1rem;
+    font-size: 0.9rem;
+    word-break: break-word;
 }
 
 .key-hint {
     color: #00ff88;
-    font-size: 0.8rem;
+    font-size: 1rem;
+    font-weight: bold;
     background-color: #1a1a1a;
-    padding: 2px 6px;
+    padding: 2px 8px;
     border-radius: 4px;
     display: inline-block;
 }
 
 .instructions {
+    text-align: center;
+    margin-top: 2rem;
+    padding: 1rem;
     background-color: #2a2a2a;
     border-radius: 8px;
-    padding: 1rem;
-    margin-top: 2rem;
 }
 
 .instructions h2 {
@@ -82,4 +87,5 @@ h1 {
 
 .instructions p {
     margin-bottom: 0.5rem;
+    color: #cccccc;
 }
