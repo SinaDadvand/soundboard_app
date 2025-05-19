@@ -19,7 +19,7 @@ sounds = {}
 
 def load_sounds():
     """Load all sound files and assign default hotkeys"""
-    hotkey_base = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12']
+    hotkey_base = ['num 1', 'num 2', 'num 3', 'num 4', 'num 5', 'num 6', 'num 7', 'num 8', 'num 9', 'num 0', 'num /', 'num *', 'num -', 'num +', 'num .']
     for filename in os.listdir(AUDIO_FOLDER):
         if filename.endswith(('.mp3', '.wav', '.ogg')):
             filepath = os.path.join(AUDIO_FOLDER, filename)
