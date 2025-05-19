@@ -10,10 +10,9 @@
     <div class="container">
         <h1>Virtual Soundboard</h1>
         <div class="soundboard numpad-layout" id="soundboard">
-            {% for audio in audio_files %}
-            <div class="sound-button" data-sound="{{ audio.filename }}">
+            {% for audio in audio_files %}            <div class="sound-button" data-sound="{{ audio.filename }}">
                 <span class="sound-name">{{ audio.name }}</span>
-                <small class="key-hint">[{{ audio.symbol }}]</small>
+                <small class="key-hint">[Ctrl + {{ audio.symbol }}]</small>
             </div>
             {% endfor %}
         </div>

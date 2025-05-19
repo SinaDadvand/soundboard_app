@@ -18,29 +18,30 @@ pygame.mixer.init()
 sounds = {}
 
 def load_sounds():
-    """Load all sound files and assign default hotkeys in numpad order"""    # Define numpad layout order with symbols (in visual order)
+    """Load all sound files and assign default hotkeys in numpad order"""
+    # Define key order with symbols
     numpad_keys = [
-        ('7', '7'), ('8', '8'), ('9', '9'), ('/', '/'),
-        ('4', '4'), ('5', '5'), ('6', '6'), ('*', '*'),
-        ('1', '1'), ('2', '2'), ('3', '3'), ('-', '-'),
-        ('0', '0'), ('.', '.'), ('+', '+')
+        ('ctrl+7', '7'), ('ctrl+8', '8'), ('ctrl+9', '9'),
+        ('ctrl+4', '4'), ('ctrl+5', '5'), ('ctrl+6', '6'),
+        ('ctrl+1', '1'), ('ctrl+2', '2'), ('ctrl+3', '3'),
+        ('ctrl+0', '0'), ('ctrl+.', '.')
     ]
     
     # Get all audio files and sort them
     audio_files = [f for f in os.listdir(AUDIO_FOLDER) if f.endswith(('.mp3', '.wav', '.ogg'))]
-    audio_files.sort()  # Sort alphabetically first
+    audio_files.sort()
     
     # Map files to hotkeys
     for i, filename in enumerate(audio_files):
         if i < len(numpad_keys):
             filepath = os.path.join(AUDIO_FOLDER, filename)
             sound = pygame.mixer.Sound(filepath)
-            hotkey, symbol = numpad_keys[i]
+            hotkey_name, symbol = numpad_keys[i]
             sounds[filename] = {
                 'sound': sound,
-                'hotkey': hotkey,
+                'hotkey': hotkey_name,
                 'symbol': symbol,
-                'order': i  # Add order for sorting in template
+                'order': i
             }
 
 def play_sound(filename):
@@ -52,8 +53,7 @@ def setup_hotkeys():
     """Setup keyboard hotkeys for each sound"""
     for filename, data in sounds.items():
         if data['hotkey']:
-            keyboard.on_press_key(data['hotkey'], 
-                                lambda e, f=filename: play_sound(f))
+            keyboard.add_hotkey(data['hotkey'], play_sound, args=(filename,))
 
 def start_keyboard_listener():
     """Start the keyboard listener in a separate thread"""
@@ -90,8 +90,9 @@ if __name__ == '__main__':
     print("\nHotkey mappings:")
     for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order']):
         if data['hotkey']:
-            print(f"{filename}: Numpad {data['symbol']}")
+            print(f"{filename}: {data['hotkey'].replace('+', ' + ')}")
     print("\nAccess the web interface at http://localhost:5000")
+    print("Hold Ctrl and press number keys to play sounds from any application")
     print("The soundboard will respond to hotkeys even when the browser is not focused")
     print("=" * 25)
     app.run(host='0.0.0.0', port=5000, debug=False)
