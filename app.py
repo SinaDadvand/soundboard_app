@@ -19,30 +19,41 @@ sounds = {}
 
 def load_sounds():
     """Load all sound files and assign default hotkeys in numpad order"""
-    # Define key order with symbols
+    # Define key order with symbols for both Ctrl and Alt combinations
     numpad_keys = [
-        ('ctrl+7', '7'), ('ctrl+8', '8'), ('ctrl+9', '9'),
-        ('ctrl+4', '4'), ('ctrl+5', '5'), ('ctrl+6', '6'),
-        ('ctrl+1', '1'), ('ctrl+2', '2'), ('ctrl+3', '3'),
-        ('ctrl+0', '0'), ('ctrl+.', '.')
+        # First set with Ctrl
+        ('ctrl+7', '7', 'ctrl'), ('ctrl+8', '8', 'ctrl'), ('ctrl+9', '9', 'ctrl'),
+        ('ctrl+4', '4', 'ctrl'), ('ctrl+5', '5', 'ctrl'), ('ctrl+6', '6', 'ctrl'),
+        ('ctrl+1', '1', 'ctrl'), ('ctrl+2', '2', 'ctrl'), ('ctrl+3', '3', 'ctrl'),
+        ('ctrl+0', '0', 'ctrl'), ('ctrl+.', '.', 'ctrl'),
+        # Second set with Alt
+        ('alt+7', '7', 'alt'), ('alt+8', '8', 'alt'), ('alt+9', '9', 'alt'),
+        ('alt+4', '4', 'alt'), ('alt+5', '5', 'alt'), ('alt+6', '6', 'alt'),
+        ('alt+1', '1', 'alt'), ('alt+2', '2', 'alt'), ('alt+3', '3', 'alt'),
+        ('alt+0', '0', 'alt'), ('alt+.', '.', 'alt')
     ]
     
     # Get all audio files and sort them
     audio_files = [f for f in os.listdir(AUDIO_FOLDER) if f.endswith(('.mp3', '.wav', '.ogg'))]
-    audio_files.sort()
+    audio_files.sort()    # Map files to hotkeys
+    total_hotkeys = len(numpad_keys)
     
-    # Map files to hotkeys
     for i, filename in enumerate(audio_files):
-        if i < len(numpad_keys):
-            filepath = os.path.join(AUDIO_FOLDER, filename)
-            sound = pygame.mixer.Sound(filepath)
-            hotkey_name, symbol = numpad_keys[i]
-            sounds[filename] = {
-                'sound': sound,
-                'hotkey': hotkey_name,
-                'symbol': symbol,
-                'order': i
-            }
+        if i >= total_hotkeys:
+            break
+            
+        filepath = os.path.join(AUDIO_FOLDER, filename)
+        sound = pygame.mixer.Sound(filepath)
+        hotkey_data = numpad_keys[i]
+        
+        sounds[filename] = {
+            'sound': sound,
+            'hotkey': hotkey_data[0],
+            'symbol': hotkey_data[1],
+            'modifier': hotkey_data[2],
+            'order': i,
+            'name': filename.split('.')[0]
+        }
 
 def play_sound(filename):
     """Play a sound file using pygame mixer"""
@@ -68,7 +79,8 @@ def index():
         'filename': filename,
         'hotkey': data['hotkey'],
         'symbol': data['symbol'],
-        'name': filename.split('.')[0]
+        'modifier': data['modifier'],
+        'name': data['name']
     } for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order'])]
     return render_template('index.html', audio_files=audio_files)
 
@@ -87,12 +99,26 @@ if __name__ == '__main__':
     load_sounds()
     setup_hotkeys()
     start_keyboard_listener()
-    print("\nHotkey mappings:")
+    
+    # Group sounds by modifier for clearer display
+    ctrl_sounds = []
+    alt_sounds = []
     for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order']):
-        if data['hotkey']:
-            print(f"{filename}: {data['hotkey'].replace('+', ' + ')}")
+        if data['modifier'] == 'ctrl':
+            ctrl_sounds.append(f"{data['name']}: Ctrl + {data['symbol']}")
+        else:
+            alt_sounds.append(f"{data['name']}: Alt + {data['symbol']}")
+    
+    print("\nCtrl Key Mappings:")
+    for mapping in ctrl_sounds:
+        print(mapping)
+    
+    print("\nAlt Key Mappings:")
+    for mapping in alt_sounds:
+        print(mapping)
+    
     print("\nAccess the web interface at http://localhost:5000")
-    print("Hold Ctrl and press number keys to play sounds from any application")
+    print("Use Ctrl or Alt with number keys to play different sounds")
     print("The soundboard will respond to hotkeys even when the browser is not focused")
     print("=" * 25)
     app.run(host='0.0.0.0', port=5000, debug=False)

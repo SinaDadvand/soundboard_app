@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to play sound and show visual feedback
     function playSound(button) {
+        if (!button) return;
+        
         // Make API call to play the sound
         fetch(`/play/${button.dataset.sound}`)
             .then(response => response.json())
