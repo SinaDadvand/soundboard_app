@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             })
             .catch(error => console.error('Error:', error));
+    }
 
     // Click event listeners
     soundButtons.forEach(button => {
