@@ -19,7 +19,7 @@ sounds = {}
 
 def load_sounds():
     """Load all sound files and assign default hotkeys in numpad order"""
-    # Define key order with symbols for both Ctrl and Alt combinations
+    # Define key order with symbols for Ctrl, Alt, and Ctrl+Alt combinations
     numpad_keys = [
         # First set with Ctrl
         ('ctrl+7', '7', 'ctrl'), ('ctrl+8', '8', 'ctrl'), ('ctrl+9', '9', 'ctrl'),
@@ -30,7 +30,12 @@ def load_sounds():
         ('alt+7', '7', 'alt'), ('alt+8', '8', 'alt'), ('alt+9', '9', 'alt'),
         ('alt+4', '4', 'alt'), ('alt+5', '5', 'alt'), ('alt+6', '6', 'alt'),
         ('alt+1', '1', 'alt'), ('alt+2', '2', 'alt'), ('alt+3', '3', 'alt'),
-        ('alt+0', '0', 'alt'), ('alt+.', '.', 'alt')
+        ('alt+0', '0', 'alt'), ('alt+.', '.', 'alt'),
+        # Third set with Ctrl+Alt
+        ('ctrl+alt+7', '7', 'ctrl+alt'), ('ctrl+alt+8', '8', 'ctrl+alt'), ('ctrl+alt+9', '9', 'ctrl+alt'),
+        ('ctrl+alt+4', '4', 'ctrl+alt'), ('ctrl+alt+5', '5', 'ctrl+alt'), ('ctrl+alt+6', '6', 'ctrl+alt'),
+        ('ctrl+alt+1', '1', 'ctrl+alt'), ('ctrl+alt+2', '2', 'ctrl+alt'), ('ctrl+alt+3', '3', 'ctrl+alt'),
+        ('ctrl+alt+0', '0', 'ctrl+alt'), ('ctrl+alt+.', '.', 'ctrl+alt')
     ]
     
     # Get all audio files and sort them
@@ -103,11 +108,14 @@ if __name__ == '__main__':
     # Group sounds by modifier for clearer display
     ctrl_sounds = []
     alt_sounds = []
+    ctrl_alt_sounds = []
     for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order']):
         if data['modifier'] == 'ctrl':
             ctrl_sounds.append(f"{data['name']}: Ctrl + {data['symbol']}")
-        else:
+        elif data['modifier'] == 'alt':
             alt_sounds.append(f"{data['name']}: Alt + {data['symbol']}")
+        else:  # ctrl+alt
+            ctrl_alt_sounds.append(f"{data['name']}: Ctrl + Alt + {data['symbol']}")
     
     print("\nCtrl Key Mappings:")
     for mapping in ctrl_sounds:
@@ -117,8 +125,12 @@ if __name__ == '__main__':
     for mapping in alt_sounds:
         print(mapping)
     
+    print("\nCtrl + Alt Key Mappings:")
+    for mapping in ctrl_alt_sounds:
+        print(mapping)
+    
     print("\nAccess the web interface at http://localhost:5000")
-    print("Use Ctrl or Alt with number keys to play different sounds")
+    print("Use Ctrl, Alt, or Ctrl + Alt with number keys to play different sounds")
     print("The soundboard will respond to hotkeys even when the browser is not focused")
     print("=" * 25)
     app.run(host='0.0.0.0', port=5000, debug=False)
