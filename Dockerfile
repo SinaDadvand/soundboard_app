@@ -1,37 +1,38 @@
-FROM python:3.9-slim
+# Use Python 3.11 slim image for smaller size
+FROM python:3.11-slim
 
-# Install required system dependencies for keyboard and audio support
-RUN apt-get update && apt-get install -y \
-    python3-dev \
-    libasound2-dev \
-    portaudio19-dev \
-    python3-pyaudio \
-    libsdl2-2.0-0 \
-    libsdl2-mixer-2.0-0 \
-    libglib2.0-0 \
-    libsndfile1 \
-    pulseaudio \
-    alsa-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set up PulseAudio environment
-ENV PULSE_SERVER=host.docker.internal
-ENV PULSE_COOKIE=/tmp/pulse/cookie
-
+# Set working directory
 WORKDIR /app
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Copy the application code
-COPY . .
+# Install system dependencies (minimal, no audio drivers needed)
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create audio directory if it doesn't exist
+# Copy requirements first for better caching
+COPY requirements_container.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements_container.txt
+
+# Copy application code
+COPY app_container.py .
+COPY static/ ./static/
+COPY templates/ ./templates/
+
+# Create audio directory (will be mounted as volume)
 RUN mkdir -p static/audio
 
-# Expose the port the app runs on
+# Expose port
 EXPOSE 5000
 
-# Command to run the application
-CMD ["python", "app.py"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/ || exit 1
+
+# Run the application
+CMD ["python", "app_container.py"]
