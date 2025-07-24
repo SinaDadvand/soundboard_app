@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_from_directory, jsonify
+from flask import Flask, render_template, send_from_directory, jsonify, request
 import os
 
 app = Flask(__name__)
@@ -89,6 +89,43 @@ def get_sounds():
         'audio_url': f'/audio/{filename}'
     } for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order'])]
     return jsonify(audio_files)
+
+@app.route('/api/play', methods=['POST'])
+def api_play_sound():
+    """API endpoint for hotkey client to trigger sound playback"""
+    try:
+        data = request.get_json()
+        sound_name = data.get('sound', '')
+        force_play = data.get('force', False)
+        
+        if sound_name in sounds:
+            return jsonify({
+                'status': 'success', 
+                'audio_url': f'/audio/{sound_name}',
+                'sound': sound_name,
+                'force': force_play
+            })
+        else:
+            return jsonify({'status': 'error', 'message': 'Sound not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/activate', methods=['POST'])
+def api_activate():
+    """API endpoint to signal browser activation"""
+    try:
+        data = request.get_json()
+        action = data.get('action', 'focus')
+        
+        return jsonify({
+            'status': 'success',
+            'action': action,
+            'message': 'Activation signal received'
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     print("\n=== Virtual Soundboard (Container Version) ===")

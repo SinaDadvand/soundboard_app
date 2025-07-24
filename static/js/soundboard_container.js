@@ -162,4 +162,71 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🎵 Virtual Soundboard (Container Mode) loaded');
     console.log('💡 Hotkeys work when this browser tab is focused');
     console.log('🐳 Audio plays through your browser');
+    
+    // API endpoint monitoring for external hotkey client
+    let lastPlayRequest = 0;
+    
+    // Function to handle external play requests
+    async function handleExternalPlayRequest() {
+        try {
+            const response = await fetch('/api/sounds');
+            const soundsData = await response.json();
+            
+            // Check for new play requests from hotkey client
+            const urlParams = new URLSearchParams(window.location.search);
+            const playSound = urlParams.get('play');
+            
+            if (playSound && Date.now() - lastPlayRequest > 100) {
+                lastPlayRequest = Date.now();
+                
+                // Find button for this sound
+                const targetButton = Array.from(soundButtons).find(button => 
+                    button.dataset.sound === playSound
+                );
+                
+                if (targetButton) {
+                    await playSound(targetButton);
+                    console.log('🎵 External play request:', playSound);
+                }
+                
+                // Clear the URL parameter
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            
+        } catch (error) {
+            console.warn('Error checking for external play requests:', error);
+        }
+    }
+    
+    // Monitor for external play requests
+    setInterval(handleExternalPlayRequest, 250);
+    
+    // Enhanced focus handling for better hotkey client support
+    window.addEventListener('focus', () => {
+        console.log('🔍 Window focused - hotkey client requests will work better');
+        initializeAudio();
+    });
+    
+    // Message listener for postMessage API
+    window.addEventListener('message', async (event) => {
+        if (event.origin !== window.location.origin) return;
+        
+        if (event.data.type === 'PLAY_SOUND') {
+            const soundFile = event.data.sound;
+            const targetButton = Array.from(soundButtons).find(button => 
+                button.dataset.sound === soundFile
+            );
+            
+            if (targetButton) {
+                await playSound(targetButton);
+                console.log('🎵 PostMessage play request:', soundFile);
+            }
+        }
+        
+        if (event.data.type === 'ACTIVATE_AUDIO') {
+            initializeAudio();
+            await preloadAllAudio();
+            console.log('🔊 Audio system activated via external request');
+        }
+    });
 });

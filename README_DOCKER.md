@@ -4,17 +4,85 @@
 
 This containerized version of the soundboard app uses **web-based audio playback** instead of system-level audio drivers, making it compatible with any Docker environment. Audio plays through your web browser using the Web Audio API.
 
+For **global hotkey support** (working from any application), use the included **Hybrid Mode** with the hotkey client.
+
 ## Key Features
 
 - 🎵 **Web-based audio playback** - No system audio dependencies
-- ⌨️ **Browser hotkey support** - Hotkeys work when browser tab is focused
+- ⌨️ **Global hotkey support** - Available via companion hotkey client
+- 🌐 **Browser hotkey support** - Hotkeys work when browser tab is focused
+- 🐳 **Universal Docker compatibility** - Runs on any system with Docker
+- 📦 **Lightweight container** - Only Flask and minimal dependencies
+- 🔄 **Volume mounting** - Easy to add/remove audio files
+
+## Deployment Options
+
+### Option A: Full Global Hotkey Support (Hybrid Mode) ⭐ **Recommended**
+
+Use the container for audio + web interface, plus a lightweight hotkey client for global hotkeys.
+
+```bash
+# Easy one-command startup (Windows)
+./start_soundboard.bat
+# or
+./start_soundboard.ps1
+
+# Manual startup
+docker-compose up -d
+pip install -r requirements_hotkey_client.txt
+python hotkey_client.py
+```
+
+### Option B: Container Only (Browser Hotkeys)
+
+Pure container mode - hotkeys only work when browser tab is focused.
+
+```bash
+# Start the container
+docker-compose up -d
+
+# Access at http://localhost:5000
+```p - Docker Container Version
+
+## Container Overview
+
+This containerized version of the soundboard app uses **web-based audio playback** instead of system-level audio drivers, making it compatible with any Docker environment. Audio plays through your web browser using the Web Audio API.
+
+## Key Features
+
+- 🎵 **Web-based audio playback** - No system audio dependencies
+- ⌨️ **Global hotkey support** - Available via companion hotkey client
+- 🌐 **Browser hotkey support** - Hotkeys work when browser tab is focused
 - 🐳 **Universal Docker compatibility** - Runs on any system with Docker
 - 📦 **Lightweight container** - Only Flask and minimal dependencies
 - 🔄 **Volume mounting** - Easy to add/remove audio files
 
 ## Quick Start
 
-### Option 1: Using Docker Compose (Recommended)
+### Option 1: Hybrid Mode - Global Hotkeys (Recommended) ⭐
+
+**Windows Users:**
+```bash
+# One-command startup (recommended)
+./start_soundboard.bat
+
+# Or using PowerShell
+./start_soundboard.ps1
+```
+
+**Manual Setup:**
+```bash
+# 1. Start container
+docker-compose up -d
+
+# 2. Install hotkey client dependencies
+pip install -r requirements_hotkey_client.txt
+
+# 3. Start global hotkey client (keep this running)
+python hotkey_client.py
+```
+
+### Option 2: Container Only Mode
 
 ```bash
 # Start the container
@@ -123,13 +191,21 @@ curl http://localhost:5000/
 
 ## Differences from Host Version
 
-| Feature | Host Version | Container Version |
-|---------|-------------|-------------------|
-| Audio Playback | pygame mixer | Web Audio API |
-| Hotkeys | Global system hotkeys | Browser-focused hotkeys |
-| Dependencies | pygame, keyboard | Flask only |
-| Platform | Windows-specific | Universal |
-| Installation | Virtual environment | Docker container |
+| Feature | Host Version | Container Only | Hybrid Mode |
+|---------|-------------|---------------|-------------|
+| Audio Playback | pygame mixer | Web Audio API | Web Audio API |
+| Hotkeys | Global system hotkeys | Browser-focused hotkeys | **Global system hotkeys** ✅ |
+| Dependencies | pygame, keyboard | Flask only | Flask + keyboard |
+| Platform | Windows-specific | Universal | Universal |
+| Installation | Virtual environment | Docker container | Docker + Python client |
+| Setup Complexity | Medium | Easy | Easy (automated) |
+
+### Hybrid Mode Benefits
+- ✅ **Best of both worlds**: Container portability + Global hotkeys
+- ✅ **Original functionality restored**: Hotkeys work from any app
+- ✅ **Easy deployment**: Automated startup scripts
+- ✅ **Maintains container benefits**: Universal compatibility
+- ✅ **Minimal overhead**: Lightweight hotkey client
 
 ## Troubleshooting
 
@@ -148,7 +224,23 @@ netstat -an | findstr :5000
 3. Check browser console for errors
 4. Verify audio files are properly mounted
 
-### Hotkeys Not Working
+### Hotkeys Not Working (Global Mode)
+**Most Common Issue**: Browser tab must stay open for Web Audio API
+
+**Solution**:
+1. Open browser to http://localhost:5000
+2. **Click anywhere on the soundboard page** (required for audio initialization)
+3. **Keep the browser tab open** (you can minimize the window)
+4. **DO NOT close the browser tab**
+5. Switch to other applications and test hotkeys
+
+**Additional Solutions**:
+- Run VS Code as Administrator (for keyboard library permissions)
+- Make sure hotkey client terminal stays open
+- Check that container is running: `docker ps`
+- Verify hotkey client shows "registered" messages
+
+### Browser-Only Mode Hotkeys
 1. Make sure browser tab is focused
 2. Check browser console for JavaScript errors
 3. Try clicking on page first to give it focus
