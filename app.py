@@ -7,6 +7,17 @@ from time import sleep
 
 app = Flask(__name__)
 
+# Disable caching for development
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+@app.after_request
+def after_request(response):
+    # Disable caching
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 # Configuration
 AUDIO_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'audio')
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
