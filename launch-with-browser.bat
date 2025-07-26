@@ -25,7 +25,7 @@ timeout /t 3 /nobreak >nul
 
 REM Open the browser
 echo Opening browser...
-start http://localhost:5000
+start http://localhost:5001/?v=%RANDOM%
 
 REM Keep the window open to show server output
 echo.

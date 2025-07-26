@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_from_directory, jsonify
+from flask import Flask, render_template, send_from_directory, jsonify, make_response
 import os
 import keyboard
 import pygame.mixer
@@ -98,7 +98,16 @@ def index():
         'modifier': data['modifier'],
         'name': data['name']
     } for filename, data in sorted(sounds.items(), key=lambda x: x[1]['order'])]
-    return render_template('index.html', audio_files=audio_files)
+    
+    # Add timestamp to force cache refresh
+    import time
+    timestamp = str(int(time.time()))
+    
+    response = make_response(render_template('index.html', audio_files=audio_files, timestamp=timestamp))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/audio/<path:filename>')
 def serve_audio(filename):
@@ -140,8 +149,8 @@ if __name__ == '__main__':
     for mapping in ctrl_alt_sounds:
         print(mapping)
     
-    print("\nAccess the web interface at http://localhost:5000")
+    print("\nAccess the web interface at http://localhost:5001")
     print("Use Ctrl, Alt, or Ctrl + Alt with number keys to play different sounds")
     print("The soundboard will respond to hotkeys even when the browser is not focused")
     print("=" * 25)
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5001, debug=False)
