@@ -1,6 +1,6 @@
 @echo off
 echo Starting Virtual Soundboard Executable...
-cd /d "C:\Users\sinadvd\Soundboard\soundboard_app\dist"
+cd /d "%~dp0dist"
 
 REM Start the executable in background
 start "" "VirtualSoundboard.exe"

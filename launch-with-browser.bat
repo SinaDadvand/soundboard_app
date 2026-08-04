@@ -5,7 +5,7 @@ REM Set window title
 title Virtual Soundboard - Auto Launch
 
 REM Change to the soundboard directory
-cd /d "c:\Users\sinadvd\Soundboard\soundboard_app"
+cd /d "%~dp0"
 
 REM Setup virtual environment and dependencies (quiet)
 if not exist "venv" (

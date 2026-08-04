@@ -5,7 +5,7 @@ REM Set window title
 title Virtual Soundboard Launcher
 
 REM Change to the soundboard directory
-cd /d "c:\Users\sinadvd\Soundboard\soundboard_app"
+cd /d "%~dp0"
 
 REM Check if Python is available
 python --version >nul 2>&1

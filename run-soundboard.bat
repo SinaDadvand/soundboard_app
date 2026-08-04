@@ -1,5 +1,5 @@
 @echo off
-cd "c:\Users\sinadvd\Soundboard\soundboard_app"
+cd /d "%~dp0"
 
 echo Starting Virtual Soundboard...
 echo.
