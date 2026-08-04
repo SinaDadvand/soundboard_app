@@ -1,10 +1,10 @@
 # PowerShell script to create a desktop shortcut for the soundboard
 $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\Virtual Soundboard.lnk")
-$Shortcut.TargetPath = "C:\Users\sinadvd\Soundboard\soundboard_app\launch-with-browser.bat"
-$Shortcut.WorkingDirectory = "C:\Users\sinadvd\Soundboard\soundboard_app"
-$Shortcut.Description = "Virtual Soundboard Application - Auto-launches browser"
-$Shortcut.IconLocation = "C:\Users\sinadvd\Soundboard\soundboard_app\Virtual Soundboard Icon.ico"
+$Shortcut.TargetPath = "C:\Users\sinadvd\Soundboard\soundboard_app\dist\VirtualSoundboard.exe"
+$Shortcut.WorkingDirectory = "C:\Users\sinadvd\Soundboard\soundboard_app\dist"
+$Shortcut.Description = "Virtual Soundboard - Standalone Executable with Neon V Icon"
+$Shortcut.IconLocation = "C:\Users\sinadvd\Soundboard\soundboard_app\neon_v_soundboard_icon.ico"
 $Shortcut.Save()
 
 Write-Host "Desktop shortcut created successfully!" -ForegroundColor Green
