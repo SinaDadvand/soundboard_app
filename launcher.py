@@ -57,13 +57,16 @@ def _run_server():
     sb.AUDIO_FOLDER = AUDIO_FOLDER
     os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-    # Load sounds / hotkeys (errors here are non-fatal – just fewer sounds)
+    # Initialize soundboard services (audio engine, hotkeys, config)
     try:
-        sb.load_sounds()
-        sb.setup_hotkeys()
-        sb.start_keyboard_listener()
-    except Exception:
-        pass
+        if hasattr(sb, 'initialize_app'):
+            sb.initialize_app()
+        else:
+            sb.load_sounds()
+            sb.setup_hotkeys()
+            sb.start_keyboard_listener()
+    except Exception as e:
+        print(f"[Launcher] Init notice: {e}")
 
     # Suppress werkzeug request-level logs in the background thread
     import logging
