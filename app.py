@@ -8,6 +8,7 @@ Flask server providing REST APIs and modern UI for:
 - Global Volume Rotary Knob, Panic Stop (Esc), and Sound Upload
 """
 
+import sys
 import os
 import time
 from flask import Flask, render_template, send_from_directory, jsonify, request, make_response
@@ -22,13 +23,38 @@ app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max upload
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-AUDIO_FOLDER = os.path.join(BASE_DIR, 'static', 'audio')
+# ── Dynamic Path Resolution (Works in normal Python & Frozen PyInstaller .exe) ──
+if getattr(sys, 'frozen', False):
+    EXE_DIR = os.path.dirname(sys.executable)
+    BUNDLE_DIR = getattr(sys, '_MEIPASS', EXE_DIR)
+    
+    # Locate audio directory (in exe dir, parent dir, or bundle)
+    audio_candidates = [
+        os.path.join(EXE_DIR, 'static', 'audio'),
+        os.path.join(os.path.dirname(EXE_DIR), 'static', 'audio'),
+        os.path.join(BUNDLE_DIR, 'static', 'audio')
+    ]
+    AUDIO_FOLDER = next((p for p in audio_candidates if os.path.exists(p) and len(os.listdir(p)) > 0), audio_candidates[0])
+
+    # Locate config JSON
+    config_candidates = [
+        os.path.join(EXE_DIR, 'soundboard_config.json'),
+        os.path.join(os.path.dirname(EXE_DIR), 'soundboard_config.json'),
+        os.path.join(BUNDLE_DIR, 'soundboard_config.json')
+    ]
+    CONFIG_PATH = next((p for p in config_candidates if os.path.exists(p)), os.path.join(EXE_DIR, 'soundboard_config.json'))
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    AUDIO_FOLDER = os.path.join(BASE_DIR, 'static', 'audio')
+    CONFIG_PATH = os.path.join(BASE_DIR, 'soundboard_config.json')
+
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
+print(f"[Soundboard] Using Audio Folder: {AUDIO_FOLDER}")
+print(f"[Soundboard] Using Config File: {CONFIG_PATH}")
 
 # Initialize Core Services
 audio_engine = AudioEngine(AUDIO_FOLDER)
-config_manager = ConfigManager(audio_dir=AUDIO_FOLDER)
+config_manager = ConfigManager(config_path=CONFIG_PATH, audio_dir=AUDIO_FOLDER)
 hotkey_manager = HotkeyManager(audio_engine, config_manager)
 
 # Apply stored settings to engine
