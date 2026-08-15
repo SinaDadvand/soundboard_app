@@ -2,8 +2,8 @@
 Audio Engine for Virtual Soundboard
 ===================================
 High-performance audio playback engine supporting:
-- Dual-device simultaneous routing (Headphones/Speakers + Virtual Audio Cable for OBS/Discord)
-- Resilient fallback for Bluetooth headsets (Sony WF-1000XM4) and VB-Audio Virtual Cable
+- Independent Headset / Virtual Cable destination toggle buttons
+- Simultaneous multi-stream routing (Headphones + VB-Audio Virtual Cable)
 - Automatic sample rate conversion & channel mapping for WASAPI / DirectSound / MME
 - Real-time volume, pitch shifting, and playback speed manipulation
 - Panic stop & individual sound stop
@@ -25,9 +25,10 @@ class AudioEngine:
         self.lock = threading.Lock()
 
         self.master_volume = 1.0  # 0.0 to 1.0
+        self.headset_enabled = True
+        self.cable_enabled = True
         self.primary_device_name = None
         self.secondary_device_name = None
-        self.secondary_enabled = False
 
     def list_output_devices(self):
         """Return a list of all available output devices on the system."""
@@ -39,8 +40,6 @@ class AudioEngine:
             for idx, dev in enumerate(raw_devices):
                 if dev['max_output_channels'] > 0:
                     api_name = host_apis[dev['hostapi']]['name'] if dev['hostapi'] < len(host_apis) else ''
-                    
-                    # Filter out problematic 16ch driver entry to prevent user confusion
                     if 'CABLE In 16ch' in dev['name'] and dev['max_output_channels'] > 2:
                         continue
 
@@ -57,56 +56,63 @@ class AudioEngine:
             print(f"[AudioEngine] Error querying devices: {e}")
         return devices
 
-    def resolve_device_id(self, device_spec, is_secondary=False):
-        """Resolve a device index by int ID or by name matching with smart fallbacks."""
+    def resolve_headphone_device(self):
+        """Find the user's primary headphones/headset (e.g. WF-1000XM4 or default)."""
         devices = self.list_output_devices()
-
-        # If nothing specified for primary output, find the best working headphones/speakers
-        if device_spec is None or device_spec == "":
-            if is_secondary:
-                return None
-            
-            # Find headphones (e.g. WF-1000XM4) or default speaker
+        
+        # 1. If explicit device name configured
+        if self.primary_device_name:
+            spec_str = self.primary_device_name.lower()
             for d in devices:
-                if any(k in d['name'].lower() for k in ['headphones', 'headset', 'speakers', 'dell']) and 'cable' not in d['name'].lower():
-                    if 'wasapi' in d['hostapi'].lower() or 'mme' in d['hostapi'].lower():
-                        return d['id']
-            return None
+                if spec_str in d['display_name'].lower() or spec_str in d['name'].lower():
+                    return d['id']
 
-        # If explicitly integer index
-        if isinstance(device_spec, int):
-            try:
-                sd.query_devices(device_spec)
-                return device_spec
-            except Exception:
-                pass
+        # 2. Auto-detect Bluetooth/USB headset or headphones
+        for d in devices:
+            d_name = d['name'].lower()
+            if any(k in d_name for k in ['1000xm4', 'headphones', 'headset']) and 'cable' not in d_name:
+                if 'wasapi' in d['hostapi'].lower() or 'mme' in d['hostapi'].lower():
+                    return d['id']
 
-        spec_str = str(device_spec).lower()
-
-        # Prefer WASAPI then MME then DirectSound
-        api_priority = {'windows wasapi': 0, 'mme': 1, 'windows directsound': 2, 'windows wdm-ks': 3}
-        sorted_devs = sorted(devices, key=lambda d: api_priority.get(d['hostapi'].lower(), 99))
-
-        # 1. Exact match on display_name or name
-        for d in sorted_devs:
-            if d['display_name'].lower() == spec_str or d['name'].lower() == spec_str:
-                return d['id']
-            if str(d['id']) == spec_str:
-                return d['id']
-
-        # 2. Substring match
-        for d in sorted_devs:
-            if spec_str in d['display_name'].lower() or spec_str in d['name'].lower():
+        # 3. Fallback to speakers
+        for d in devices:
+            d_name = d['name'].lower()
+            if any(k in d_name for k in ['speakers', 'dell']) and 'cable' not in d_name:
                 return d['id']
 
         return None
 
-    def set_devices(self, primary=None, secondary=None, secondary_enabled=False):
-        """Configure primary and secondary output devices."""
+    def resolve_cable_device(self):
+        """Find VB-Audio CABLE Input."""
+        devices = self.list_output_devices()
+        
+        if self.secondary_device_name:
+            spec_str = self.secondary_device_name.lower()
+            for d in devices:
+                if spec_str in d['display_name'].lower() or spec_str in d['name'].lower():
+                    return d['id']
+
+        # Auto-detect CABLE Input (prioritize WASAPI then MME)
+        for d in devices:
+            if 'cable input' in d['name'].lower() and 'wasapi' in d['hostapi'].lower():
+                return d['id']
+        for d in devices:
+            if 'cable input' in d['name'].lower():
+                return d['id']
+
+        return None
+
+    def set_devices(self, primary=None, secondary=None, secondary_enabled=True):
         with self.lock:
             self.primary_device_name = primary
             self.secondary_device_name = secondary
-            self.secondary_enabled = bool(secondary_enabled) and (secondary is not None)
+            self.cable_enabled = bool(secondary_enabled)
+
+    def set_toggles(self, headset_enabled=True, cable_enabled=True):
+        """Toggle output to Headset or Virtual Cable destinations."""
+        with self.lock:
+            self.headset_enabled = bool(headset_enabled)
+            self.cable_enabled = bool(cable_enabled)
 
     def load_audio(self, filepath):
         """Load and cache audio file as float32 stereo array."""
@@ -118,7 +124,6 @@ class AudioEngine:
 
         data, sr = sf.read(filepath, dtype='float32')
 
-        # Convert mono to stereo (N, 2)
         if data.ndim == 1:
             data = np.column_stack((data, data))
         elif data.shape[1] > 2:
@@ -129,7 +134,6 @@ class AudioEngine:
         return data, sr
 
     def preload_directory(self, directory=None):
-        """Preload all audio files in the specified directory."""
         target_dir = directory or self.audio_dir
         if not target_dir or not os.path.exists(target_dir):
             return
@@ -144,7 +148,6 @@ class AudioEngine:
 
     @staticmethod
     def apply_speed(data, speed_factor):
-        """Change playback speed and pitch together (varispeed)."""
         if speed_factor == 1.0 or speed_factor <= 0:
             return data
         
@@ -159,7 +162,6 @@ class AudioEngine:
 
     @staticmethod
     def _phase_vocoder(d, rate, hop_length=512):
-        """Phase vocoder for single-channel time stretching."""
         n_fft = 2048
         _, _, stft = signal.stft(d, nperseg=n_fft, noverlap=n_fft - hop_length)
         
@@ -185,7 +187,6 @@ class AudioEngine:
 
     @classmethod
     def apply_pitch_shift(cls, data, semitones):
-        """Pitch shift without changing playback speed (semitones: -12 to +12)."""
         if semitones == 0:
             return data
         
@@ -213,7 +214,6 @@ class AudioEngine:
             return np.ascontiguousarray(out, dtype=np.float32)
 
     def process_audio(self, raw_data, volume=1.0, speed=1.0, pitch_semitones=0.0):
-        """Apply volume, pitch, and speed transformations."""
         processed = raw_data.copy()
 
         if pitch_semitones != 0:
@@ -230,7 +230,7 @@ class AudioEngine:
         return np.ascontiguousarray(processed, dtype=np.float32)
 
     def play(self, filepath, volume=1.0, speed=1.0, pitch_semitones=0.0, sound_id=None):
-        """Play audio across configured devices with automatic sample-rate & channel adaptation."""
+        """Play audio across enabled output destinations (Headset and/or Virtual Cable)."""
         try:
             data, sr = self.load_audio(filepath)
         except Exception as e:
@@ -241,13 +241,18 @@ class AudioEngine:
 
         devices_to_play = []
         with self.lock:
-            p_id = self.resolve_device_id(self.primary_device_name, is_secondary=False)
-            devices_to_play.append(p_id)
+            if self.headset_enabled:
+                h_dev = self.resolve_headphone_device()
+                devices_to_play.append(h_dev)
 
-            if self.secondary_enabled and self.secondary_device_name is not None:
-                s_id = self.resolve_device_id(self.secondary_device_name, is_secondary=True)
-                if s_id is not None and s_id != p_id:
-                    devices_to_play.append(s_id)
+            if self.cable_enabled:
+                c_dev = self.resolve_cable_device()
+                if c_dev is not None and c_dev not in devices_to_play:
+                    devices_to_play.append(c_dev)
+
+        # Fallback if both disabled
+        if not devices_to_play:
+            devices_to_play.append(self.resolve_headphone_device())
 
         stop_event = threading.Event()
         stream_entry = {
@@ -292,13 +297,6 @@ class AudioEngine:
                         pos = end
             except Exception as ex:
                 print(f"[AudioEngine] Playback notice on device {dev_id}: {ex}")
-                # Fallback to default output device if a specific Bluetooth device was temporarily busy
-                if dev_id is not None:
-                    try:
-                        with sd.OutputStream(samplerate=sr, channels=2, device=None, dtype='float32') as fallback_stream:
-                            fallback_stream.write(np.ascontiguousarray(audio_to_play, dtype=np.float32))
-                    except Exception:
-                        pass
 
         with self.lock:
             self.active_streams.append(stream_entry)
@@ -319,14 +317,12 @@ class AudioEngine:
         return True
 
     def stop_sound(self, sound_id):
-        """Stop all active instances of a specific sound."""
         with self.lock:
             for entry in list(self.active_streams):
                 if entry['sound_id'] == sound_id:
                     entry['stop_event'].set()
 
     def stop_all(self):
-        """Panic stop: Stop all active playing sounds immediately."""
         with self.lock:
             for entry in self.active_streams:
                 entry['stop_event'].set()

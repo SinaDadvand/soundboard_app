@@ -30,15 +30,15 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 ::-webkit-scrollbar-track {
     background: #0b0d13;
 }
 ::-webkit-scrollbar-thumb {
     background: #2b354d;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
     background: #3b4754;
@@ -48,140 +48,122 @@ body {
 .numpad-frame {
     background: #111520;
     border: 1px solid #222a3d;
-    border-radius: 20px;
-    padding: 1.25rem;
+    border-radius: 16px;
+    padding: 1rem;
     box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Numpad Keycap Card */
+/* Compact Numpad Keycap Card */
 .numpad-key {
     background: linear-gradient(180deg, #1b202e 0%, #151924 100%);
     border: 1px solid var(--border-keycap);
-    border-radius: 14px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 10px;
+    box-shadow: 0 3px 5px -1px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     user-select: none;
 }
 
 .numpad-key:hover {
     background: linear-gradient(180deg, #242b3d 0%, #1c2232 100%);
-    border-color: rgba(56, 189, 248, 0.5);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px -2px rgba(0, 0, 0, 0.6), 0 0 12px rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.45);
+    transform: translateY(-1.5px);
+    box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.15);
 }
 
 .numpad-key.playing {
     border-color: var(--neon-cyan);
-    box-shadow: 0 0 20px rgba(6, 182, 212, 0.5), inset 0 0 12px rgba(6, 182, 212, 0.25);
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.5), inset 0 0 8px rgba(6, 182, 212, 0.25);
     animation: keyPulse 1.2s infinite ease-in-out;
 }
 
 @keyframes keyPulse {
-    0%, 100% { border-color: #06b6d4; box-shadow: 0 0 20px rgba(6, 182, 212, 0.5); }
-    50% { border-color: #38bdf8; box-shadow: 0 0 25px rgba(56, 189, 248, 0.7); }
+    0%, 100% { border-color: #06b6d4; }
+    50% { border-color: #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.7); }
+}
+
+/* Hotkey Badge */
+.hotkey-badge {
+    background: #0f131d;
+    border: 1px solid #334155;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #38bdf8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.hotkey-badge:hover {
+    border-color: #38bdf8;
+    background: #1e293b;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
 }
 
 /* Subtle Neon Blue Play Button */
 .play-btn-neon {
-    background: rgba(6, 182, 212, 0.15);
-    border: 1px solid rgba(6, 182, 212, 0.4);
+    background: rgba(6, 182, 212, 0.12);
+    border: 1px solid rgba(6, 182, 212, 0.35);
     color: #38bdf8;
-    border-radius: 10px;
+    border-radius: 8px;
     transition: all 0.15s ease-in-out;
 }
 
 .play-btn-neon:hover {
-    background: rgba(6, 182, 212, 0.3);
+    background: rgba(6, 182, 212, 0.25);
     border-color: #38bdf8;
-    box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
     color: #ffffff;
-    transform: scale(1.05);
 }
 
-.play-btn-neon:active {
-    transform: scale(0.95);
-}
-
-/* Sliders with HIGH VISIBILITY Tracks */
-input[type=range] {
-    -webkit-appearance: none;
-    width: 100%;
-    background: transparent;
-    height: 20px;
-}
-
-input[type=range]:focus {
-    outline: none;
-}
-
-/* Track Styling - High Contrast & Clearly Visible */
-input[type=range]::-webkit-slider-runnable-track {
-    width: 100%;
-    height: 8px;
+/* Destination Selector Toggle Buttons */
+.dest-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid #2b354d;
+    background: #141824;
+    color: #64748b;
     cursor: pointer;
-    background: #2a3449;
-    border: 1px solid #3d4a66;
-    border-radius: 4px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+    transition: all 0.18s ease;
 }
 
-input[type=range]::-moz-range-track {
-    width: 100%;
-    height: 8px;
-    cursor: pointer;
-    background: #2a3449;
-    border: 1px solid #3d4a66;
-    border-radius: 4px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+.dest-toggle-btn.active {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: #06b6d4;
+    color: #38bdf8;
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
 }
 
-/* Slider Thumbs */
-input[type=range]::-webkit-slider-thumb {
-    height: 16px;
-    width: 16px;
+.dest-toggle-btn.active .dest-led {
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+}
+
+.dest-led {
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: #38bdf8;
-    border: 2px solid #ffffff;
-    cursor: pointer;
-    -webkit-appearance: none;
-    margin-top: -5px;
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5);
-    transition: transform 0.1s ease, background-color 0.15s ease;
+    background: #475569;
+    transition: all 0.18s ease;
 }
 
-input[type=range]::-moz-range-thumb {
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: #38bdf8;
-    border: 2px solid #ffffff;
-    cursor: pointer;
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-/* Speed Slider Thumb - Pink Accent */
-input[type=range].slider-pink::-webkit-slider-thumb {
-    background: #f43f5e;
-    box-shadow: 0 0 8px rgba(244, 63, 94, 0.8);
-}
-
-/* Volume Slider Thumb - Cyan/Blue Accent */
-input[type=range].slider-cyan::-webkit-slider-thumb {
-    background: #06b6d4;
-    box-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
-}
-
-/* Rotary Volume Knob Styling */
+/* Rotary Volume Knob with DOT Indicator */
 .rotary-knob-container {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #151926;
+    background: #141824;
     border: 1px solid #28334a;
-    padding: 6px 14px;
-    border-radius: 16px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    padding: 5px 12px;
+    border-radius: 14px;
 }
 
 .rotary-knob {
@@ -196,15 +178,71 @@ input[type=range].slider-cyan::-webkit-slider-thumb {
     transition: transform 0.05s linear;
 }
 
-.rotary-indicator {
+/* Circular Dot on Knob Edge */
+.rotary-dot {
     position: absolute;
-    top: 3px;
+    top: 4px;
     left: 50%;
-    width: 3px;
-    height: 9px;
-    background: #261b02;
-    border-radius: 2px;
+    width: 5px;
+    height: 5px;
+    background: #241902;
+    border-radius: 50%;
     transform: translateX(-50%);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.8), 0 0.5px 0.5px rgba(255, 255, 255, 0.4);
+}
+
+/* High Visibility Sliders */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+    height: 18px;
+}
+
+input[type=range]:focus {
+    outline: none;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 7px;
+    cursor: pointer;
+    background: #2a3449;
+    border: 1px solid #3d4a66;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+input[type=range]::-webkit-slider-thumb {
+    height: 15px;
+    width: 15px;
+    border-radius: 50%;
+    background: #38bdf8;
+    border: 2px solid #ffffff;
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -4px;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+}
+
+input[type=range].slider-pink::-webkit-slider-thumb {
+    background: #f43f5e;
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.8);
+}
+
+input[type=range].slider-cyan::-webkit-slider-thumb {
+    background: #06b6d4;
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
+}
+
+/* Vertical Sliders for FX Sidebar */
+input[type=range].vertical-slider {
+    writing-mode: bt-lr; /* IE */
+    -webkit-appearance: slider-vertical; /* WebKit */
+    width: 18px;
+    height: 120px;
+    padding: 0;
+    cursor: pointer;
 }
 
 /* Panic Button Glowing Accent */
@@ -219,18 +257,13 @@ input[type=range].slider-cyan::-webkit-slider-thumb {
     transform: scale(1.02);
 }
 
-.panic-btn:active {
-    transform: scale(0.98);
-}
-
-/* Reset Button */
 .reset-btn {
-    padding: 2px 6px;
-    border-radius: 6px;
+    padding: 1px 5px;
+    border-radius: 4px;
     background: #242c3d;
     border: 1px solid #36425b;
     color: #94a3b8;
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
     transition: all 0.15s ease;
 }

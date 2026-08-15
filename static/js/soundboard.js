@@ -1,12 +1,11 @@
 /**
  * Virtual Soundboard Numpad Pro - Frontend Controller
  * ==================================================
- * - 3 Numpad Keycap Sections (Ctrl, Alt, Ctrl+Alt)
- * - Gold Rotary Volume Knob with drag & scroll support
- * - Browser Click Playback uses Global FX; Physical Hotkeys use per-clip FX
- * - Individual Reset (↺) buttons on every Pitch, Speed, and Volume slider
- * - High-contrast visible slider tracks
- * - Audio device routing to VB-CABLE Input for OBS / Discord streaming
+ * - 2 Instant Output Destination Toggles (Headset & Virtual Cable)
+ * - Compact single-line keycaps (Hotkey Left, Track Title Right)
+ * - Gold Rotary Knob with Dot indicator
+ * - Vertical Global FX Rack on the side
+ * - High-contrast slider tracks & individual reset buttons
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let sounds = [];
     let masterVolume = 1.0;
     let panicKey = 'esc';
+    let headsetEnabled = true;
+    let cableEnabled = true;
     let isRebinding = false;
     let rebindingSoundId = null;
     let activePlayingIds = new Set();
@@ -24,6 +25,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const gridCtrlAlt = document.getElementById('grid-ctrl-alt');
     const soundCounter = document.getElementById('sound-counter-badge');
 
+    // Destination Toggles
+    const toggleHeadsetBtn = document.getElementById('toggle-headset-btn');
+    const toggleCableBtn = document.getElementById('toggle-cable-btn');
+
     // Rotary Knob Elements
     const volumeKnob = document.getElementById('volume-knob');
     const knobIndicator = document.getElementById('knob-indicator');
@@ -32,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const panicStopBtn = document.getElementById('panic-stop-btn');
     const panicKeyBadge = document.getElementById('panic-key-badge');
 
-    // Global FX Elements
+    // Vertical Global FX Elements
     const globalPitchSlider = document.getElementById('global-pitch-slider');
     const globalPitchVal = document.getElementById('global-pitch-val');
     const resetGlobalPitchBtn = document.getElementById('reset-global-pitch-btn');
@@ -51,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Settings Modal Elements
     const primaryDeviceSelect = document.getElementById('primary-device-select');
     const secondaryDeviceSelect = document.getElementById('secondary-device-select');
-    const secondaryToggle = document.getElementById('secondary-enabled-toggle');
     const panicKeyInput = document.getElementById('panic-key-input');
     const savePanicKeyBtn = document.getElementById('save-panic-key-btn');
     const saveAudioSettingsBtn = document.getElementById('save-audio-settings-btn');
@@ -65,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadNameInput = document.getElementById('upload-name-input');
     const uploadHotkeyInput = document.getElementById('upload-hotkey-input');
 
-    // Rebind Modal Elements
+    // Rebind Elements
     const rebindSoundName = document.getElementById('rebind-sound-name');
     const keyDisplay = document.getElementById('captured-key-display');
     const clearHotkeyBtn = document.getElementById('clear-hotkey-btn');
@@ -79,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadDevices();
         setupEventListeners();
         setupRotaryKnob();
+        setupDestinationToggles();
     }
 
     async function loadSounds() {
@@ -104,40 +109,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/devices');
             const data = await res.json();
             
-            primaryDeviceSelect.innerHTML = '<option value="">Default Windows Playback Device</option>';
-            secondaryDeviceSelect.innerHTML = '<option value="">Select CABLE Input (VB-Audio Virtual Cable)...</option>';
-
-            let autoSelectVirtualCable = null;
+            primaryDeviceSelect.innerHTML = '<option value="">Default Headphones / WF-1000XM4</option>';
+            secondaryDeviceSelect.innerHTML = '<option value="">CABLE Input (VB-Audio Virtual Cable)</option>';
 
             data.devices.forEach(dev => {
                 const optPrimary = document.createElement('option');
                 optPrimary.value = dev.name;
                 optPrimary.textContent = `${dev.name} (${dev.hostapi})`;
-                if (dev.name === data.current_primary || dev.display_name === data.current_primary) optPrimary.selected = true;
+                if (dev.name === data.current_primary) optPrimary.selected = true;
                 primaryDeviceSelect.appendChild(optPrimary);
 
                 const optSec = document.createElement('option');
                 optSec.value = dev.name;
                 optSec.textContent = `${dev.name} (${dev.hostapi})`;
-                if (dev.name === data.current_secondary || dev.display_name === data.current_secondary) optSec.selected = true;
-                if (!data.current_secondary && dev.name.includes('CABLE Input')) {
-                    autoSelectVirtualCable = dev.name;
-                }
+                if (dev.name === data.current_secondary) optSec.selected = true;
                 secondaryDeviceSelect.appendChild(optSec);
             });
-
-            if (autoSelectVirtualCable && !data.current_secondary) {
-                secondaryDeviceSelect.value = autoSelectVirtualCable;
-            }
-
-            secondaryToggle.checked = !!data.secondary_enabled;
         } catch (err) {
             console.error('Error loading devices:', err);
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Render 3 Numpad Grids (7,8,9 / 4,5,6 / 1,2,3 / 0 (span-2), .)
+    // Render Compact Numpad Grids
     // ─────────────────────────────────────────────────────────────────────────
     function renderNumpadGrids() {
         gridCtrl.innerHTML = '';
@@ -147,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         soundCounter.textContent = `${sounds.length} sounds`;
 
         sounds.forEach(sound => {
-            const card = createNumpadCard(sound);
+            const card = createCompactNumpadCard(sound);
             const mod = (sound.modifier || '').toLowerCase();
 
             if (mod === 'ctrl') {
@@ -160,71 +154,57 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function createNumpadCard(sound) {
+    function createCompactNumpadCard(sound) {
         const card = document.createElement('div');
         card.id = `card-${sound.id}`;
         
-        // 0 key spans 2 columns like a real physical numpad
         const isZeroKey = sound.symbol === '0' || (sound.hotkey && sound.hotkey.endsWith('0'));
         const spanClass = isZeroKey ? 'col-span-2' : 'col-span-1';
 
-        card.className = `numpad-key p-3 flex flex-col justify-between gap-2.5 ${spanClass} ${
+        card.className = `numpad-key p-2.5 flex flex-col justify-between gap-2 ${spanClass} ${
             activePlayingIds.has(sound.id) ? 'playing' : ''
         }`;
 
         const isPlaying = activePlayingIds.has(sound.id);
-        const symbolText = sound.symbol || sound.name.charAt(0).toUpperCase();
         const hotkeyText = sound.hotkey ? sound.hotkey.toUpperCase() : 'NO KEY';
-
         const curVol = sound.volume !== undefined ? sound.volume : 1.0;
         const curPitch = sound.pitch || 0;
         const curSpeed = sound.speed || 1.0;
 
         card.innerHTML = `
-            <div>
-                <!-- Top Key Header: Symbol Badge + Delete -->
-                <div class="flex items-center justify-between gap-1 mb-1">
-                    <div class="flex items-center gap-1.5">
-                        <span class="w-6 h-6 rounded-md bg-[#10141f] border border-[#2b354d] text-cyan-400 font-mono font-bold text-xs flex items-center justify-center shadow-inner">${symbolText}</span>
-                        <button class="hotkey-badge text-[10px]" title="Click to rebind hotkey">${hotkeyText}</button>
-                    </div>
-                    <button class="delete-sound-btn text-slate-500 hover:text-red-400 p-0.5 opacity-0 hover:opacity-100 transition" title="Delete sound">
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                    </button>
-                </div>
-                <!-- Sound Name -->
-                <h3 class="font-bold text-slate-100 text-xs leading-snug line-clamp-2" title="${sound.name}">${sound.name}</h3>
+            <!-- Single Row Header: Hotkey Left, Track Title Right -->
+            <div class="flex items-center justify-between gap-1.5 w-full">
+                <button class="hotkey-badge" title="Click to rebind hotkey">${hotkeyText}</button>
+                <h3 class="font-bold text-slate-200 text-xs truncate max-w-[120px] text-right" title="${sound.name}">${sound.name}</h3>
             </div>
 
-            <!-- Action Bar: Play/Stop + FX Accordion Toggle -->
+            <!-- Action Row: Play/Stop + FX Drawer Button -->
             <div class="flex items-center justify-between gap-2 pt-1 border-t border-[#222a3d]">
-                <button class="play-btn-neon play-btn px-2.5 py-1.5 text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition" title="${isPlaying ? 'Stop' : 'Play Sound'}">
+                <button class="play-btn-neon play-btn px-2 py-1 text-[11px] font-bold flex items-center gap-1 shadow-sm active:scale-95 transition" title="${isPlaying ? 'Stop' : 'Play Sound'}">
                     ${isPlaying ? `
-                        <svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 24 24">
                             <rect x="6" y="6" width="12" height="12" rx="2"/>
                         </svg>
                         <span>Stop</span>
                     ` : `
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z"/>
                         </svg>
                         <span>Play</span>
                     `}
                 </button>
 
-                <button class="toggle-fx-btn text-[11px] text-slate-400 hover:text-cyan-400 font-semibold transition flex items-center gap-0.5">
+                <button class="toggle-fx-btn text-[10px] text-slate-400 hover:text-cyan-400 font-semibold transition flex items-center gap-0.5">
                     <span>FX</span>
-                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
             </div>
 
-            <!-- Sliders Drawer with HIGH VISIBILITY Tracks & Reset Buttons -->
-            <div class="fx-panel hidden space-y-2 pt-2 border-t border-[#222a3d] text-xs text-slate-400">
-                <!-- Volume Slider -->
+            <!-- Sliders Drawer with High-Visibility Tracks & Individual Resets -->
+            <div class="fx-panel hidden space-y-1.5 pt-1.5 border-t border-[#222a3d] text-xs text-slate-400">
+                <!-- Volume -->
                 <div class="space-y-0.5">
                     <div class="flex items-center justify-between text-[10px]">
                         <span class="font-semibold text-slate-300">Vol:</span>
@@ -236,19 +216,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="range" class="sound-vol-slider slider-cyan" min="0" max="1.5" step="0.05" value="${curVol}">
                 </div>
 
-                <!-- Pitch Slider -->
+                <!-- Pitch -->
                 <div class="space-y-0.5">
                     <div class="flex items-center justify-between text-[10px]">
                         <span class="font-semibold text-slate-300">Pitch:</span>
                         <div class="flex items-center gap-1">
-                            <span class="pitch-val font-mono text-cyan-300 font-bold">${curPitch > 0 ? '+' : ''}${curPitch} st</span>
+                            <span class="pitch-val font-mono text-cyan-300 font-bold">${curPitch > 0 ? '+' : ''}${curPitch}st</span>
                             <button class="reset-pitch-btn reset-btn" title="Reset Pitch to 0 st">↺</button>
                         </div>
                     </div>
                     <input type="range" class="sound-pitch-slider" min="-12" max="12" step="1" value="${curPitch}">
                 </div>
 
-                <!-- Speed Slider -->
+                <!-- Speed -->
                 <div class="space-y-0.5">
                     <div class="flex items-center justify-between text-[10px]">
                         <span class="font-semibold text-slate-300">Speed:</span>
@@ -262,10 +242,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        // Card Listeners
         const playBtn = card.querySelector('.play-btn');
         const hotkeyBadge = card.querySelector('.hotkey-badge');
-        const deleteBtn = card.querySelector('.delete-sound-btn');
         const toggleFxBtn = card.querySelector('.toggle-fx-btn');
         const fxPanel = card.querySelector('.fx-panel');
 
@@ -297,20 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
             openRebindModal(sound);
         });
 
-        // Delete
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (confirm(`Delete "${sound.name}"?`)) {
-                deleteSound(sound.id);
-            }
-        });
-
         // Toggle FX drawer
         toggleFxBtn.addEventListener('click', () => {
             fxPanel.classList.toggle('hidden');
         });
 
-        // Volume Slider & Reset
+        // Volume
         volSlider.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
             sound.volume = val;
@@ -325,22 +295,22 @@ document.addEventListener('DOMContentLoaded', () => {
             updateSoundConfig(sound.id, { volume: 1.0 });
         });
 
-        // Pitch Slider & Reset
+        // Pitch
         pitchSlider.addEventListener('input', (e) => {
             const val = parseInt(e.target.value);
             sound.pitch = val;
-            pitchVal.textContent = `${val > 0 ? '+' : ''}${val} st`;
+            pitchVal.textContent = `${val > 0 ? '+' : ''}${val}st`;
             updateSoundConfig(sound.id, { pitch: val });
         });
 
         resetPitchBtn.addEventListener('click', () => {
             sound.pitch = 0;
             pitchSlider.value = 0;
-            pitchVal.textContent = '0 st';
+            pitchVal.textContent = '0st';
             updateSoundConfig(sound.id, { pitch: 0 });
         });
 
-        // Speed Slider & Reset
+        // Speed
         speedSlider.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
             sound.speed = val;
@@ -359,10 +329,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Playback Logic (Browser Click applies Global FX; Hotkeys use per-clip FX)
+    // Destination Toggles (Headset & Virtual Cable)
+    // ─────────────────────────────────────────────────────────────────────────
+    function setupDestinationToggles() {
+        toggleHeadsetBtn.addEventListener('click', async () => {
+            headsetEnabled = !headsetEnabled;
+            toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+            await syncDestinationToggles();
+        });
+
+        toggleCableBtn.addEventListener('click', async () => {
+            cableEnabled = !cableEnabled;
+            toggleCableBtn.classList.toggle('active', cableEnabled);
+            await syncDestinationToggles();
+        });
+    }
+
+    async function syncDestinationToggles() {
+        try {
+            await fetch('/api/routing_toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    headset_enabled: headsetEnabled,
+                    cable_enabled: cableEnabled
+                })
+            });
+        } catch (err) {
+            console.error('Error syncing destination toggles:', err);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Playback Logic
     // ─────────────────────────────────────────────────────────────────────────
     async function playFromBrowser(sound) {
-        // Browser click combines individual sound settings with Global FX controls
         const gPitch = parseInt(globalPitchSlider.value) || 0;
         const gSpeed = parseFloat(globalSpeedSlider.value) || 1.0;
 
@@ -406,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const playBtn = card.querySelector('.play-btn');
             if (playBtn) {
                 playBtn.innerHTML = `
-                    <svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 24 24">
                         <rect x="6" y="6" width="12" height="12" rx="2"/>
                     </svg>
                     <span>Stop</span>
@@ -417,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const playBtn = card.querySelector('.play-btn');
             if (playBtn) {
                 playBtn.innerHTML = `
-                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>
                     </svg>
                     <span>Play</span>
@@ -442,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const playBtn = c.querySelector('.play-btn');
             if (playBtn) {
                 playBtn.innerHTML = `
-                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>
                     </svg>
                     <span>Play</span>
@@ -469,25 +470,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function deleteSound(soundId) {
-        try {
-            const res = await fetch(`/api/sounds/${soundId}`, { method: 'DELETE' });
-            if (res.ok) {
-                sounds = sounds.filter(s => s.id !== soundId);
-                renderNumpadGrids();
-            }
-        } catch (err) {
-            console.error('Delete sound error:', err);
-        }
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
-    // Gold Rotary Knob Interaction (Drag, Wheel, Click)
+    // Gold Rotary Knob with Dot
     // ─────────────────────────────────────────────────────────────────────────
     function updateKnobVisual(vol) {
-        // Map 0.0 -> -135deg, 1.0 -> 135deg (270 deg total sweep)
         const angle = -135 + (vol * 270);
-        knobIndicator.style.transform = `translateX(-50%) rotate(${angle}deg)`;
         volumeKnob.style.transform = `rotate(${angle}deg)`;
         masterVolVal.textContent = `${Math.round(vol * 100)}%`;
     }
@@ -506,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.addEventListener('mousemove', (e) => {
             if (!isDraggingKnob) return;
-            const deltaY = startY - e.clientY; // drag up = increase volume
+            const deltaY = startY - e.clientY;
             let newVol = Math.max(0.0, Math.min(1.0, startVol + (deltaY / 120)));
             masterVolume = newVol;
             updateKnobVisual(newVol);
@@ -523,7 +510,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Wheel support on volume knob
         volumeKnob.addEventListener('wheel', async (e) => {
             e.preventDefault();
             const delta = e.deltaY < 0 ? 0.05 : -0.05;
@@ -536,13 +522,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Master Mute button
         masterMuteBtn.addEventListener('click', async () => {
-            if (masterVolume > 0) {
-                masterVolume = 0;
-            } else {
-                masterVolume = 1.0;
-            }
+            masterVolume = masterVolume > 0 ? 0 : 1.0;
             updateKnobVisual(masterVolume);
             await fetch('/api/master_volume', {
                 method: 'POST',
@@ -553,15 +534,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Rebind Modal / Interactive Key Recorder
+    // Rebind Modal
     // ─────────────────────────────────────────────────────────────────────────
     function openRebindModal(sound) {
         isRebinding = true;
         rebindingSoundId = sound.id;
         rebindSoundName.textContent = `Clip: ${sound.name}`;
         keyDisplay.textContent = sound.hotkey ? `Current: ${sound.hotkey.toUpperCase()}` : 'Listening for keys...';
-        keyDisplay.classList.remove('text-cyan-400');
-        keyDisplay.classList.add('text-cyan-300');
         rebindModal.classList.remove('hidden');
     }
 
@@ -628,12 +607,12 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelRebindBtn.addEventListener('click', closeRebindModal);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // General Event Listeners & Modals
+    // General Event Listeners
     // ─────────────────────────────────────────────────────────────────────────
     function setupEventListeners() {
         panicStopBtn.addEventListener('click', panicStopAll);
 
-        // Global Pitch
+        // Vertical Global Pitch
         globalPitchSlider.addEventListener('input', (e) => {
             const val = e.target.value;
             globalPitchVal.textContent = `${val > 0 ? '+' : ''}${val} st`;
@@ -644,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
             globalPitchVal.textContent = '0 st';
         });
 
-        // Global Speed
+        // Vertical Global Speed
         globalSpeedSlider.addEventListener('input', (e) => {
             globalSpeedVal.textContent = `${parseFloat(e.target.value).toFixed(2)}x`;
         });
@@ -678,11 +657,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Audio Settings Save
+        // Settings Save
         saveAudioSettingsBtn.addEventListener('click', async () => {
             const primary = primaryDeviceSelect.value !== '' ? primaryDeviceSelect.value : null;
             const secondary = secondaryDeviceSelect.value !== '' ? secondaryDeviceSelect.value : null;
-            const secondaryEnabled = secondaryToggle.checked;
 
             try {
                 await fetch('/api/devices', {
@@ -691,10 +669,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({
                         primary_device: primary,
                         secondary_device: secondary,
-                        secondary_enabled: secondaryEnabled
+                        secondary_enabled: true
                     })
                 });
-                alert('Audio routing to Speakers & Virtual Cable saved successfully!');
+                alert('Audio device settings saved!');
                 settingsModal.classList.add('hidden');
             } catch (err) {
                 console.error('Save audio settings error:', err);

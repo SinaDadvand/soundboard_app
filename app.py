@@ -75,11 +75,23 @@ def api_status():
         'status': 'ok',
         'master_volume': audio_engine.master_volume,
         'panic_key': config_manager.config.get('panic_key', 'esc'),
-        'primary_device': audio_engine.primary_device_name,
-        'secondary_device': audio_engine.secondary_device_name,
-        'secondary_enabled': audio_engine.secondary_enabled,
+        'headset_enabled': audio_engine.headset_enabled,
+        'cable_enabled': audio_engine.cable_enabled,
         'active_streams': len(audio_engine.active_streams),
         'sound_count': len(config_manager.config.get('sounds', []))
+    })
+
+
+@app.route('/api/routing_toggle', methods=['POST'])
+def api_routing_toggle():
+    data = request.get_json() or {}
+    headset = data.get('headset_enabled', True)
+    cable = data.get('cable_enabled', True)
+    audio_engine.set_toggles(headset, cable)
+    return jsonify({
+        'status': 'success',
+        'headset_enabled': audio_engine.headset_enabled,
+        'cable_enabled': audio_engine.cable_enabled
     })
 
 
@@ -90,7 +102,9 @@ def api_get_devices():
         'devices': devices,
         'current_primary': audio_engine.primary_device_name,
         'current_secondary': audio_engine.secondary_device_name,
-        'secondary_enabled': audio_engine.secondary_enabled
+        'secondary_enabled': audio_engine.cable_enabled,
+        'headset_enabled': audio_engine.headset_enabled,
+        'cable_enabled': audio_engine.cable_enabled
     })
 
 
@@ -99,7 +113,7 @@ def api_set_devices():
     data = request.get_json() or {}
     primary = data.get('primary_device')
     secondary = data.get('secondary_device')
-    secondary_enabled = bool(data.get('secondary_enabled', False))
+    secondary_enabled = bool(data.get('secondary_enabled', True))
 
     audio_engine.set_devices(primary, secondary, secondary_enabled)
     config_manager.config['primary_device'] = primary

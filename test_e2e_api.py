@@ -47,6 +47,15 @@ class TestSoundboardE2E(unittest.TestCase):
         })
         self.assertEqual(post_res.status_code, 200)
 
+        # Test routing toggle
+        toggle_res = self.client.post('/api/routing_toggle', json={
+            'headset_enabled': True,
+            'cable_enabled': False
+        })
+        self.assertEqual(toggle_res.status_code, 200)
+        self.assertEqual(toggle_res.get_json()['headset_enabled'], True)
+        self.assertEqual(toggle_res.get_json()['cable_enabled'], False)
+
     def test_04_api_sounds(self):
         res = self.client.get('/api/sounds')
         self.assertEqual(res.status_code, 200)
