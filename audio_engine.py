@@ -2,11 +2,11 @@
 Audio Engine for Virtual Soundboard
 ===================================
 High-performance audio playback engine supporting:
-- Dual-device simultaneous routing (Speakers + Virtual Audio Cable for OBS/Discord)
+- Dual-device simultaneous routing (Headphones/Speakers + Virtual Audio Cable for OBS/Discord)
+- Resilient fallback for Bluetooth headsets (Sony WF-1000XM4) and VB-Audio Virtual Cable
 - Automatic sample rate conversion & channel mapping for WASAPI / DirectSound / MME
 - Real-time volume, pitch shifting, and playback speed manipulation
 - Panic stop & individual sound stop
-- Device resolution by name and fallback
 """
 
 import os
@@ -39,6 +39,11 @@ class AudioEngine:
             for idx, dev in enumerate(raw_devices):
                 if dev['max_output_channels'] > 0:
                     api_name = host_apis[dev['hostapi']]['name'] if dev['hostapi'] < len(host_apis) else ''
+                    
+                    # Filter out problematic 16ch driver entry to prevent user confusion
+                    if 'CABLE In 16ch' in dev['name'] and dev['max_output_channels'] > 2:
+                        continue
+
                     devices.append({
                         'id': idx,
                         'name': dev['name'],
@@ -52,12 +57,23 @@ class AudioEngine:
             print(f"[AudioEngine] Error querying devices: {e}")
         return devices
 
-    def resolve_device_id(self, device_spec):
-        """Resolve a device index by int ID or by name matching."""
+    def resolve_device_id(self, device_spec, is_secondary=False):
+        """Resolve a device index by int ID or by name matching with smart fallbacks."""
+        devices = self.list_output_devices()
+
+        # If nothing specified for primary output, find the best working headphones/speakers
         if device_spec is None or device_spec == "":
+            if is_secondary:
+                return None
+            
+            # Find headphones (e.g. WF-1000XM4) or default speaker
+            for d in devices:
+                if any(k in d['name'].lower() for k in ['headphones', 'headset', 'speakers', 'dell']) and 'cable' not in d['name'].lower():
+                    if 'wasapi' in d['hostapi'].lower() or 'mme' in d['hostapi'].lower():
+                        return d['id']
             return None
 
-        # If already int
+        # If explicitly integer index
         if isinstance(device_spec, int):
             try:
                 sd.query_devices(device_spec)
@@ -66,20 +82,20 @@ class AudioEngine:
                 pass
 
         spec_str = str(device_spec).lower()
-        devices = self.list_output_devices()
-        # Sort devices so WASAPI and MME are preferred over DirectSound for virtual cables
-        api_priority = {'windows wasapi': 0, 'mme': 1, 'windows directsound': 2, 'windows wdm-ks': 3}
-        devices.sort(key=lambda d: api_priority.get(d['hostapi'].lower(), 99))
 
-        # 1. Exact match
-        for d in devices:
+        # Prefer WASAPI then MME then DirectSound
+        api_priority = {'windows wasapi': 0, 'mme': 1, 'windows directsound': 2, 'windows wdm-ks': 3}
+        sorted_devs = sorted(devices, key=lambda d: api_priority.get(d['hostapi'].lower(), 99))
+
+        # 1. Exact match on display_name or name
+        for d in sorted_devs:
             if d['display_name'].lower() == spec_str or d['name'].lower() == spec_str:
                 return d['id']
             if str(d['id']) == spec_str:
                 return d['id']
 
         # 2. Substring match
-        for d in devices:
+        for d in sorted_devs:
             if spec_str in d['display_name'].lower() or spec_str in d['name'].lower():
                 return d['id']
 
@@ -225,11 +241,11 @@ class AudioEngine:
 
         devices_to_play = []
         with self.lock:
-            p_id = self.resolve_device_id(self.primary_device_name)
+            p_id = self.resolve_device_id(self.primary_device_name, is_secondary=False)
             devices_to_play.append(p_id)
 
             if self.secondary_enabled and self.secondary_device_name is not None:
-                s_id = self.resolve_device_id(self.secondary_device_name)
+                s_id = self.resolve_device_id(self.secondary_device_name, is_secondary=True)
                 if s_id is not None and s_id != p_id:
                     devices_to_play.append(s_id)
 
@@ -260,9 +276,6 @@ class AudioEngine:
                         if dev_max_ch == 1:
                             target_audio = target_audio[:, 0:1]
                             target_channels = 1
-                        elif dev_max_ch > 2 and dev_info.get('hostapi') == 0:  # MME 16ch
-                            target_audio = np.tile(target_audio, (1, dev_max_ch // 2))
-                            target_channels = dev_max_ch
                     except Exception as dev_err:
                         print(f"[AudioEngine] Device query notice on {dev_id}: {dev_err}")
 
@@ -278,7 +291,14 @@ class AudioEngine:
                         stream.write(chunk)
                         pos = end
             except Exception as ex:
-                print(f"[AudioEngine] Playback error on device {dev_id}: {ex}")
+                print(f"[AudioEngine] Playback notice on device {dev_id}: {ex}")
+                # Fallback to default output device if a specific Bluetooth device was temporarily busy
+                if dev_id is not None:
+                    try:
+                        with sd.OutputStream(samplerate=sr, channels=2, device=None, dtype='float32') as fallback_stream:
+                            fallback_stream.write(np.ascontiguousarray(audio_to_play, dtype=np.float32))
+                    except Exception:
+                        pass
 
         with self.lock:
             self.active_streams.append(stream_entry)
