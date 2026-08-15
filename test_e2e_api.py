@@ -115,6 +115,45 @@ class TestSoundboardE2E(unittest.TestCase):
         self.assertEqual(panic_res.status_code, 200)
         self.assertEqual(panic_res.get_json()['panic_key'], 'esc')
 
+    def test_09_global_fx(self):
+        fx_res = self.client.post('/api/global_fx', json={
+            'pitch': 4.0,
+            'speed': 1.25,
+            'echo': 0.5,
+            'reverb': 0.6
+        })
+        self.assertEqual(fx_res.status_code, 200)
+        data = fx_res.get_json()
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['pitch'], 4.0)
+        self.assertEqual(data['speed'], 1.25)
+        self.assertEqual(data['echo'], 0.5)
+        self.assertEqual(data['reverb'], 0.6)
+
+        status_res = self.client.get('/api/status')
+        s_data = status_res.get_json()
+        self.assertEqual(s_data['global_pitch'], 4.0)
+        self.assertEqual(s_data['global_echo'], 0.5)
+
+    def test_10_upload_and_replace_hotkey(self):
+        import io
+        fake_audio = io.BytesIO(b"fake audio data content")
+        data = {
+            'file': (fake_audio, 'test_replacement.mp3'),
+            'name': 'Test Replacement Sound',
+            'hotkey': 'ctrl+7'
+        }
+        res = self.client.post('/api/sounds/upload', data=data, content_type='multipart/form-data')
+        self.assertEqual(res.status_code, 200)
+        sound = res.get_json()['sound']
+        self.assertEqual(sound['hotkey'], 'ctrl+7')
+        self.assertEqual(sound['name'], 'Test Replacement Sound')
+
+        # Clean up created file
+        created_file = os.path.join(audio_engine.audio_dir, sound['filename'])
+        if os.path.exists(created_file):
+            os.remove(created_file)
+
 
 if __name__ == '__main__':
     unittest.main()

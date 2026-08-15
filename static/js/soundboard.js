@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let masterVolume = 1.0;
     let globalPitch = 0;       // -12 to +12 semitones
     let globalSpeed = 1.0;      // 0.5 to 2.0x
+    let globalEcho = 0.0;       // 0.0 to 1.0 (0% to 100%)
+    let globalReverb = 0.0;     // 0.0 to 1.0 (0% to 100%)
     let panicKey = 'esc';
     let headsetEnabled = true;
     let cableEnabled = true;
@@ -31,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleHeadsetBtn = document.getElementById('toggle-headset-btn');
     const toggleCableBtn = document.getElementById('toggle-cable-btn');
 
-    // 3 Knobs Elements
+    // 5 Hardware Knobs Elements
     const volumeKnob = document.getElementById('volume-knob');
     const volumeIndicator = document.getElementById('volume-indicator');
     const masterVolVal = document.getElementById('master-volume-val');
@@ -45,6 +47,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const speedIndicator = document.getElementById('speed-indicator');
     const globalSpeedVal = document.getElementById('global-speed-val');
     const resetSpeedKnobBtn = document.getElementById('reset-speed-knob-btn');
+
+    const echoKnob = document.getElementById('echo-knob');
+    const echoIndicator = document.getElementById('echo-indicator');
+    const globalEchoVal = document.getElementById('global-echo-val');
+    const resetEchoKnobBtn = document.getElementById('reset-echo-knob-btn');
+
+    const reverbKnob = document.getElementById('reverb-knob');
+    const reverbIndicator = document.getElementById('reverb-indicator');
+    const globalReverbVal = document.getElementById('global-reverb-val');
+    const resetReverbKnobBtn = document.getElementById('reset-reverb-knob-btn');
 
     const fxPresetBtns = document.querySelectorAll('.fx-preset-btn');
     const panicStopBtn = document.getElementById('panic-stop-btn');
@@ -92,18 +104,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadSounds() {
         try {
-            const res = await fetch('/api/sounds');
-            const data = await res.json();
-            sounds = data.sounds || [];
-            masterVolume = data.master_volume !== undefined ? data.master_volume : 1.0;
-            panicKey = data.panic_key || 'esc';
+            const res = await fetch('/api/status');
+            const statusData = await res.json();
+            
+            masterVolume = statusData.master_volume !== undefined ? statusData.master_volume : 1.0;
+            globalPitch = statusData.global_pitch !== undefined ? statusData.global_pitch : 0.0;
+            globalSpeed = statusData.global_speed !== undefined ? statusData.global_speed : 1.0;
+            globalEcho = statusData.global_echo !== undefined ? statusData.global_echo : 0.0;
+            globalReverb = statusData.global_reverb !== undefined ? statusData.global_reverb : 0.0;
+            panicKey = statusData.panic_key || 'esc';
 
             updateVolumeKnobVisual(masterVolume);
             updatePitchKnobVisual(globalPitch);
             updateSpeedKnobVisual(globalSpeed);
+            updateEchoKnobVisual(globalEcho);
+            updateReverbKnobVisual(globalReverb);
 
             panicKeyBadge.textContent = panicKey.toUpperCase();
             panicKeyInput.value = panicKey;
+
+            const sRes = await fetch('/api/sounds');
+            const sData = await sRes.json();
+            sounds = sData.sounds || [];
 
             renderNumpadGrids();
         } catch (err) {
@@ -116,6 +138,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/devices');
             const data = await res.json();
             
+            if (data.headset_enabled !== undefined) {
+                headsetEnabled = Boolean(data.headset_enabled);
+                toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+            }
+            if (data.cable_enabled !== undefined) {
+                cableEnabled = Boolean(data.cable_enabled);
+                toggleCableBtn.classList.toggle('active', cableEnabled);
+            }
+
             primaryDeviceSelect.innerHTML = '<option value="">Sony Headset / Wireless Stereo Headset</option>';
             secondaryDeviceSelect.innerHTML = '<option value="">CABLE Input (VB-Audio Virtual Cable)</option>';
 
@@ -147,18 +178,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         soundCounter.textContent = `${sounds.length} sounds`;
 
-        sounds.forEach(sound => {
-            const card = createNumpadCard(sound);
-            const mod = (sound.modifier || '').toLowerCase();
-
-            if (mod === 'ctrl') {
-                gridCtrl.appendChild(card);
-            } else if (mod === 'alt') {
-                gridAlt.appendChild(card);
-            } else {
-                gridCtrlAlt.appendChild(card);
+        const symbolOrder = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '.'];
+        
+        const getCardKeyRank = (sound) => {
+            const sym = (sound.symbol || '').toString();
+            const idx = symbolOrder.indexOf(sym);
+            if (idx !== -1) return idx;
+            if (sound.hotkey) {
+                for (let i = 0; i < symbolOrder.length; i++) {
+                    if (sound.hotkey.endsWith(symbolOrder[i])) return i;
+                }
             }
-        });
+            return sound.order !== undefined ? sound.order : 99;
+        };
+
+        const ctrlSounds = sounds.filter(s => (s.modifier || '').toLowerCase() === 'ctrl')
+                                 .sort((a, b) => getCardKeyRank(a) - getCardKeyRank(b));
+        const altSounds = sounds.filter(s => (s.modifier || '').toLowerCase() === 'alt')
+                                .sort((a, b) => getCardKeyRank(a) - getCardKeyRank(b));
+        const ctrlAltSounds = sounds.filter(s => (s.modifier || '').toLowerCase() === 'ctrl+alt')
+                                    .sort((a, b) => getCardKeyRank(a) - getCardKeyRank(b));
+
+        ctrlSounds.forEach(s => gridCtrl.appendChild(createNumpadCard(s)));
+        altSounds.forEach(s => gridAlt.appendChild(createNumpadCard(s)));
+        ctrlAltSounds.forEach(s => gridCtrlAlt.appendChild(createNumpadCard(s)));
     }
 
     function createNumpadCard(sound) {
@@ -354,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function syncDestinationToggles() {
         try {
-            await fetch('/api/routing_toggle', {
+            const res = await fetch('/api/routing_toggle', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -362,6 +405,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     cable_enabled: cableEnabled
                 })
             });
+            const data = await res.json();
+            if (data.status === 'success') {
+                headsetEnabled = Boolean(data.headset_enabled);
+                cableEnabled = Boolean(data.cable_enabled);
+                toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+                toggleCableBtn.classList.toggle('active', cableEnabled);
+            }
         } catch (err) {
             console.error('Error syncing destination toggles:', err);
         }
@@ -371,9 +421,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Playback Logic
     // ─────────────────────────────────────────────────────────────────────────
     async function playFromBrowser(sound) {
-        const effectivePitch = (sound.pitch || 0) + globalPitch;
-        const effectiveSpeed = (sound.speed || 1.0) * globalSpeed;
-        const effectiveVol = (sound.volume !== undefined ? sound.volume : 1.0);
+        const soundPitch = (sound.pitch !== undefined ? sound.pitch : 0);
+        const soundSpeed = (sound.speed !== undefined ? sound.speed : 1.0);
+        const soundVol = (sound.volume !== undefined ? sound.volume : 1.0);
 
         setCardPlayingVisual(sound.id, true);
 
@@ -382,9 +432,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    volume: effectiveVol,
-                    pitch: effectivePitch,
-                    speed: effectiveSpeed
+                    volume: soundVol,
+                    pitch: soundPitch,
+                    speed: soundSpeed
                 })
             });
         } catch (err) {
@@ -475,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 3 Rotary Knobs: Volume, Pitch, Speed
+    // 5 Rotary Knobs: Volume, Pitch, Speed, Echo, Reverb
     // ─────────────────────────────────────────────────────────────────────────
     function updateVolumeKnobVisual(vol) {
         const angle = -135 + (vol * 270);
@@ -497,6 +547,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const angle = -135 + (norm * 270);
         speedKnob.style.transform = `rotate(${angle}deg)`;
         globalSpeedVal.textContent = `${speed.toFixed(2)}x`;
+    }
+
+    function updateEchoKnobVisual(echo) {
+        // 0.0 to 1.0 -> angle -135 to +135
+        const angle = -135 + (echo * 270);
+        echoKnob.style.transform = `rotate(${angle}deg)`;
+        globalEchoVal.textContent = `${Math.round(echo * 100)}%`;
+    }
+
+    function updateReverbKnobVisual(reverb) {
+        // 0.0 to 1.0 -> angle -135 to +135
+        const angle = -135 + (reverb * 270);
+        reverbKnob.style.transform = `rotate(${angle}deg)`;
+        globalReverbVal.textContent = `${Math.round(reverb * 100)}%`;
+    }
+
+    let globalFxDebounceTimer = null;
+    function syncGlobalFX() {
+        clearTimeout(globalFxDebounceTimer);
+        globalFxDebounceTimer = setTimeout(async () => {
+            try {
+                await fetch('/api/global_fx', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pitch: globalPitch,
+                        speed: globalSpeed,
+                        echo: globalEcho,
+                        reverb: globalReverb
+                    })
+                });
+            } catch (err) {
+                console.error('Error syncing global FX:', err);
+            }
+        }, 30);
     }
 
     function setupKnobs() {
@@ -561,12 +646,13 @@ document.addEventListener('DOMContentLoaded', () => {
             pitchKnob,
             () => globalPitch,
             -12, 12, 1,
-            (val) => { globalPitch = val; updatePitchKnobVisual(val); }
+            (val) => { globalPitch = val; updatePitchKnobVisual(val); syncGlobalFX(); }
         );
 
         resetPitchKnobBtn.addEventListener('click', () => {
             globalPitch = 0;
             updatePitchKnobVisual(0);
+            syncGlobalFX();
         });
 
         // 3. Speed Knob
@@ -574,12 +660,41 @@ document.addEventListener('DOMContentLoaded', () => {
             speedKnob,
             () => globalSpeed,
             0.5, 2.0, 0.05,
-            (val) => { globalSpeed = val; updateSpeedKnobVisual(val); }
+            (val) => { globalSpeed = val; updateSpeedKnobVisual(val); syncGlobalFX(); }
         );
 
         resetSpeedKnobBtn.addEventListener('click', () => {
             globalSpeed = 1.0;
             updateSpeedKnobVisual(1.0);
+            syncGlobalFX();
+        });
+
+        // 4. Echo Knob
+        bindKnob(
+            echoKnob,
+            () => globalEcho,
+            0.0, 1.0, 0.05,
+            (val) => { globalEcho = val; updateEchoKnobVisual(val); syncGlobalFX(); }
+        );
+
+        resetEchoKnobBtn.addEventListener('click', () => {
+            globalEcho = 0.0;
+            updateEchoKnobVisual(0.0);
+            syncGlobalFX();
+        });
+
+        // 5. Reverb Knob
+        bindKnob(
+            reverbKnob,
+            () => globalReverb,
+            0.0, 1.0, 0.05,
+            (val) => { globalReverb = val; updateReverbKnobVisual(val); syncGlobalFX(); }
+        );
+
+        resetReverbKnobBtn.addEventListener('click', () => {
+            globalReverb = 0.0;
+            updateReverbKnobVisual(0.0);
+            syncGlobalFX();
         });
 
         // Presets
@@ -587,8 +702,14 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 globalPitch = parseInt(btn.dataset.pitch) || 0;
                 globalSpeed = parseFloat(btn.dataset.speed) || 1.0;
+                globalEcho = parseFloat(btn.dataset.echo) || 0.0;
+                globalReverb = parseFloat(btn.dataset.reverb) || 0.0;
+
                 updatePitchKnobVisual(globalPitch);
                 updateSpeedKnobVisual(globalSpeed);
+                updateEchoKnobVisual(globalEcho);
+                updateReverbKnobVisual(globalReverb);
+                syncGlobalFX();
             });
         });
     }
@@ -778,8 +899,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    sounds.push(data.sound);
-                    renderNumpadGrids();
+                    await loadSounds();
                     uploadModal.classList.add('hidden');
                     uploadForm.reset();
                     fileNameDisplay.classList.add('hidden');

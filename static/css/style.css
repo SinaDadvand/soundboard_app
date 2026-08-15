@@ -203,6 +203,18 @@ body {
     border: 2px solid #4c0519;
 }
 
+/* Amber Echo Knob */
+.knob-amber {
+    background: radial-gradient(circle at 35% 35%, #fde68a 0%, #d97706 60%, #78350f 100%);
+    border: 2px solid #451a03;
+}
+
+/* Purple Reverb Knob */
+.knob-purple {
+    background: radial-gradient(circle at 35% 35%, #e9d5ff 0%, #9333ea 60%, #581c87 100%);
+    border: 2px solid #3b0764;
+}
+
 /* Circular Dot on Knob Edge */
 .rotary-dot {
     position: absolute;

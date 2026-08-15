@@ -66,11 +66,11 @@ class ConfigManager:
         self.save_config(config)
         return config
 
-    def sync_audio_files(self, config):
-        """Ensure all audio files in the audio folder have structured numpad config entries."""
+    def sync_audio_files(self, config, force_reassign_hotkeys=True):
+        """Ensure all audio files in the audio folder have structured numpad config entries sorted A to Z."""
         valid_exts = ('.mp3', '.wav', '.ogg', '.flac')
         existing_files = [f for f in os.listdir(self.audio_dir) if f.lower().endswith(valid_exts)]
-        existing_files.sort()
+        existing_files.sort(key=lambda x: x.lower())
 
         sound_map = {s['filename']: s for s in config.get('sounds', [])}
         updated_sounds = []
@@ -84,13 +84,14 @@ class ConfigManager:
                 entry = sound_map[filename]
                 entry.setdefault('id', str(uuid.uuid4())[:8])
                 entry.setdefault('name', os.path.splitext(filename)[0])
-                entry.setdefault('hotkey', key_info[0])
-                entry.setdefault('symbol', key_info[1])
-                entry.setdefault('modifier', key_info[2])
+                if force_reassign_hotkeys or not entry.get('hotkey'):
+                    entry['hotkey'] = key_info[0]
+                    entry['symbol'] = key_info[1]
+                    entry['modifier'] = key_info[2]
                 entry.setdefault('volume', 1.0)
                 entry.setdefault('speed', 1.0)
                 entry.setdefault('pitch', 0.0)
-                entry.setdefault('order', idx)
+                entry['order'] = idx
                 updated_sounds.append(entry)
             else:
                 clean_name = os.path.splitext(filename)[0]
@@ -146,8 +147,37 @@ class ConfigManager:
                 return s
         return None
 
+    def replace_sound_by_hotkey(self, hotkey, filename, name=None, volume=1.0, speed=1.0, pitch=0.0, delete_old_file=False):
+        """Replace existing sound assigned to a given hotkey with a new file."""
+        clean_hk = str(hotkey).strip().lower()
+        existing = self.get_sound_by_hotkey(clean_hk)
+        if not existing:
+            return None
+
+        old_file = existing.get('filename')
+        if delete_old_file and old_file and old_file != filename:
+            old_path = os.path.join(self.audio_dir, old_file)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception as e:
+                    print(f"[ConfigManager] Notice deleting replaced audio file {old_path}: {e}")
+
+        existing['filename'] = filename
+        existing['name'] = name or os.path.splitext(filename)[0]
+        existing['volume'] = float(volume)
+        existing['speed'] = float(speed)
+        existing['pitch'] = float(pitch)
+        self.save_config()
+        return existing
+
     def add_sound(self, filename, name=None, hotkey=None, volume=1.0, speed=1.0, pitch=0.0):
-        """Add a newly uploaded sound file to configuration."""
+        """Add a newly uploaded sound file to configuration, replacing if hotkey already exists."""
+        if hotkey:
+            replaced = self.replace_sound_by_hotkey(hotkey, filename, name=name, volume=volume, speed=speed, pitch=pitch)
+            if replaced:
+                return replaced
+
         clean_name = name or os.path.splitext(filename)[0]
         sound_id = str(uuid.uuid4())[:8]
         

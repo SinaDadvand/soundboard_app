@@ -29,11 +29,22 @@ def test_engine():
     print(f"[TEST] Pitch shifted +4 semitones: shape={pitch_up.shape}")
     assert pitch_up.shape == data[:22050].shape, "Pitch shift output shape should match input"
     
-    # 5. Test Volume processing
-    scaled = engine.process_audio(data, volume=0.5, speed=1.0, pitch_semitones=0.0)
-    assert np.max(np.abs(scaled)) <= np.max(np.abs(data)) + 1e-4
-    
-    # 6. Test Playback and Stop
+    # 5. Test Echo effect
+    echoed = engine.apply_echo(data[:22050], sr, echo_level=0.5)
+    print(f"[TEST] Echo applied: shape={echoed.shape}")
+    assert len(echoed) >= len(data[:22050]), "Echo output length should be >= input"
+
+    # 6. Test Reverb effect
+    reverbed = engine.apply_reverb(data[:22050], sr, reverb_level=0.6)
+    print(f"[TEST] Reverb applied: shape={reverbed.shape}")
+    assert len(reverbed) >= len(data[:22050]), "Reverb output length should be >= input"
+
+    # 7. Test Global FX processing
+    engine.set_global_fx(pitch=2.0, speed=1.1, echo=0.3, reverb=0.4)
+    processed = engine.process_audio(data[:22050], sr=sr, volume=0.8)
+    assert processed.shape[1] == 2 and np.max(np.abs(processed)) <= 1.0
+
+    # 8. Test Playback and Stop
     print("[TEST] Testing play and stop...")
     engine.play(test_file, volume=0.1, sound_id="test_clip")
     time.sleep(0.2)

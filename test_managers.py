@@ -35,6 +35,12 @@ def test_managers():
     hm.update_panic_key('esc')
     assert cm.config['panic_key'] == 'esc'
     
+    # Test hotkey replacement on add
+    target_hotkey = 'ctrl+7'
+    rep = cm.add_sound(filename='temp_test.mp3', name='Replaced Clip', hotkey=target_hotkey)
+    assert rep['name'] == 'Replaced Clip' and rep['filename'] == 'temp_test.mp3'
+    assert cm.get_sound_by_hotkey(target_hotkey)['name'] == 'Replaced Clip'
+
     # Clean up test config file
     if os.path.exists(config_path):
         os.remove(config_path)

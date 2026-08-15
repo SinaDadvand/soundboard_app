@@ -48,6 +48,7 @@ def _run_server():
 
     try:
         import app as sb
+        sb.initialize_app()
     except Exception as exc:
         msgbox.showerror('Import Error', f'Could not load soundboard app:\n{exc}')
         return

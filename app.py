@@ -59,10 +59,18 @@ hotkey_manager = HotkeyManager(audio_engine, config_manager)
 
 # Apply stored settings to engine
 audio_engine.master_volume = config_manager.config.get('master_volume', 1.0)
+audio_engine.set_global_fx(
+    pitch=config_manager.config.get('global_pitch', 0.0),
+    speed=config_manager.config.get('global_speed', 1.0),
+    echo=config_manager.config.get('global_echo', 0.0),
+    reverb=config_manager.config.get('global_reverb', 0.0)
+)
+audio_engine.headset_enabled = config_manager.config.get('headset_enabled', True)
+audio_engine.cable_enabled = config_manager.config.get('cable_enabled', config_manager.config.get('secondary_enabled', True))
 audio_engine.set_devices(
     primary=config_manager.config.get('primary_device'),
     secondary=config_manager.config.get('secondary_device'),
-    secondary_enabled=config_manager.config.get('secondary_enabled', False)
+    secondary_enabled=audio_engine.cable_enabled
 )
 
 
@@ -100,6 +108,10 @@ def api_status():
     return jsonify({
         'status': 'ok',
         'master_volume': audio_engine.master_volume,
+        'global_pitch': audio_engine.global_pitch,
+        'global_speed': audio_engine.global_speed,
+        'global_echo': audio_engine.global_echo,
+        'global_reverb': audio_engine.global_reverb,
         'panic_key': config_manager.config.get('panic_key', 'esc'),
         'headset_enabled': audio_engine.headset_enabled,
         'cable_enabled': audio_engine.cable_enabled,
@@ -108,12 +120,42 @@ def api_status():
     })
 
 
+@app.route('/api/global_fx', methods=['GET', 'POST'])
+def api_global_fx():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        pitch = data.get('pitch', audio_engine.global_pitch)
+        speed = data.get('speed', audio_engine.global_speed)
+        echo = data.get('echo', audio_engine.global_echo)
+        reverb = data.get('reverb', audio_engine.global_reverb)
+
+        audio_engine.set_global_fx(pitch=pitch, speed=speed, echo=echo, reverb=reverb)
+
+        config_manager.config['global_pitch'] = audio_engine.global_pitch
+        config_manager.config['global_speed'] = audio_engine.global_speed
+        config_manager.config['global_echo'] = audio_engine.global_echo
+        config_manager.config['global_reverb'] = audio_engine.global_reverb
+        config_manager.save_config()
+
+    return jsonify({
+        'status': 'success',
+        'pitch': audio_engine.global_pitch,
+        'speed': audio_engine.global_speed,
+        'echo': audio_engine.global_echo,
+        'reverb': audio_engine.global_reverb
+    })
+
+
 @app.route('/api/routing_toggle', methods=['POST'])
 def api_routing_toggle():
     data = request.get_json() or {}
-    headset = data.get('headset_enabled', True)
-    cable = data.get('cable_enabled', True)
+    headset = bool(data.get('headset_enabled', True))
+    cable = bool(data.get('cable_enabled', True))
     audio_engine.set_toggles(headset, cable)
+    config_manager.config['headset_enabled'] = headset
+    config_manager.config['cable_enabled'] = cable
+    config_manager.config['secondary_enabled'] = cable
+    config_manager.save_config()
     return jsonify({
         'status': 'success',
         'headset_enabled': audio_engine.headset_enabled,
