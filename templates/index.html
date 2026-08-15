@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Virtual Soundboard Pro</title>
+    <title>Virtual Soundboard Numpad Pro</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -21,11 +21,13 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            50: '#f5f3ff',
-                            500: '#8b5cf6',
-                            600: '#7c3aed',
-                            700: '#6d28d9',
+                        numpad: {
+                            base: '#111520',
+                            key: '#181d2a',
+                            cream: '#f4ede2',
+                            gold: '#d4af37',
+                            cyan: '#06b6d4',
+                            blue: '#38bdf8',
                         }
                     },
                     fontFamily: {
@@ -38,60 +40,74 @@
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ timestamp }}">
 </head>
-<body class="bg-[#0c0e14] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-purple-500 selection:text-white">
+<body class="bg-[#0b0d13] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white">
 
-    <!-- Top Navigation Bar -->
-    <header class="sticky top-0 z-40 bg-[#10141f]/90 backdrop-blur-md border-b border-[#232a3b] px-4 lg:px-8 py-3">
-        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-40 bg-[#0f131d]/95 backdrop-blur-md border-b border-[#1f2738] px-4 lg:px-8 py-3">
+        <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-4 flex-wrap">
             
-            <!-- Logo & Status -->
+            <!-- App Brand & Status -->
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-                    </svg>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#d4af37] via-[#06b6d4] to-[#38bdf8] p-[1px] shadow-lg shadow-cyan-500/10">
+                    <div class="w-full h-full bg-[#111520] rounded-[11px] flex items-center justify-center">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                    </div>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-purple-200 to-cyan-400 bg-clip-text text-transparent">Virtual Soundboard <span class="text-xs uppercase px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-500/30 text-purple-300 font-mono">Pro FX</span></h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-bold tracking-tight text-white">Virtual Soundboard</h1>
+                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-[#f4ede2]/10 text-[#f4ede2] border border-[#f4ede2]/20">Numpad Layout</span>
+                    </div>
                     <div class="flex items-center gap-2 text-xs text-slate-400">
                         <span id="engine-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                         <span id="engine-status-text">Engine Ready</span>
                         <span class="text-slate-600">•</span>
-                        <span id="sound-counter-badge" class="text-slate-400">0 sounds</span>
+                        <span id="sound-counter-badge" class="text-slate-400">32 sounds</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Global Controls: Master Volume & Panic Stop -->
+            <!-- Global Controls: Rotary Volume Knob & Panic Stop -->
             <div class="flex items-center gap-4 flex-wrap justify-end">
                 
-                <!-- Master Volume Slider -->
-                <div class="flex items-center gap-2.5 bg-[#171c28] border border-[#262f42] rounded-xl px-3 py-1.5 shadow-inner">
-                    <button id="master-mute-btn" title="Toggle Mute" class="text-slate-400 hover:text-white transition">
-                        <svg id="volume-icon" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <!-- Gold Rotary Volume Dial -->
+                <div class="rotary-knob-container">
+                    <button id="master-mute-btn" title="Click to mute/unmute" class="text-slate-400 hover:text-white transition">
+                        <svg id="volume-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
                         </svg>
                     </button>
-                    <input id="master-volume-slider" type="range" min="0" max="100" value="100" class="w-24 lg:w-32 accent-purple-500">
-                    <span id="master-volume-val" class="text-xs font-mono font-bold text-purple-400 w-9 text-right">100%</span>
+                    
+                    <!-- Interactive Rotary Knob -->
+                    <div id="volume-knob" class="rotary-knob" title="Drag or scroll to adjust Master Volume">
+                        <div id="knob-indicator" class="rotary-indicator"></div>
+                    </div>
+
+                    <div class="flex flex-col">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Volume</span>
+                        <span id="master-volume-val" class="text-xs font-mono font-bold text-[#d4af37]">100%</span>
+                    </div>
                 </div>
 
                 <!-- Panic STOP ALL Button -->
                 <button id="panic-stop-btn" class="panic-btn flex items-center gap-2 px-4 py-2 rounded-xl text-white font-bold text-sm tracking-wide cursor-pointer shadow-lg active:scale-95 transition">
-                    <span class="w-2.5 h-2.5 rounded-sm bg-white animate-ping"></span>
+                    <span class="w-2 h-2 rounded-sm bg-white animate-ping"></span>
                     <span>STOP ALL</span>
                     <kbd id="panic-key-badge" class="bg-black/40 border border-red-300/40 text-red-200 text-xs px-1.5 py-0.5 rounded font-mono font-bold">ESC</kbd>
                 </button>
 
-                <!-- Action Buttons -->
-                <button id="open-upload-modal-btn" class="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-sm px-3.5 py-2 rounded-xl shadow-md shadow-purple-600/20 transition">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <!-- Add Sound Button -->
+                <button id="open-upload-modal-btn" class="flex items-center gap-1.5 bg-[#1b2233] hover:bg-[#252f47] border border-[#303d59] hover:border-cyan-500/50 text-slate-200 hover:text-white font-semibold text-xs px-3.5 py-2.5 rounded-xl shadow-md transition">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     <span>Add Sound</span>
                 </button>
 
-                <button id="open-settings-modal-btn" title="Audio Device & Hotkey Settings" class="p-2 rounded-xl bg-[#171c28] border border-[#262f42] hover:border-purple-500/50 hover:bg-[#1f2637] text-slate-300 hover:text-white transition">
+                <!-- Audio Settings Modal Gear -->
+                <button id="open-settings-modal-btn" title="Audio Device & Virtual Cable Routing Settings" class="p-2.5 rounded-xl bg-[#151926] border border-[#28334a] hover:border-cyan-500/50 hover:bg-[#1d2334] text-slate-300 hover:text-cyan-400 transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -101,104 +117,111 @@
         </div>
     </header>
 
-    <!-- Main Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
-
-        <!-- Toolbar: Category Soundbanks & Search Bar -->
-        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-[#121622] p-3 rounded-2xl border border-[#202737]">
-            
-            <!-- Category Tabs -->
-            <div id="category-tabs-container" class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-                <!-- Dynamically populated category pills -->
+    <!-- Global FX Controls Bar (Only applies to Browser Click Playback) -->
+    <div class="bg-[#0f131d] border-b border-[#1f2738] px-4 lg:px-8 py-2.5">
+        <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div class="flex items-center gap-2 text-xs">
+                <span class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-700/50 text-cyan-300 font-bold uppercase tracking-wider">Browser Global FX</span>
+                <span class="text-slate-400 hidden sm:inline">Modifies sounds clicked in the browser (Physical hotkeys use per-sound presets)</span>
             </div>
 
-            <!-- Search & Actions -->
-            <div class="flex items-center gap-2 min-w-[240px]">
-                <div class="relative flex-1">
-                    <input id="sound-search-input" type="text" placeholder="Search sounds or hotkeys..." class="w-full bg-[#181e2e] border border-[#2a3449] focus:border-purple-500 rounded-xl px-3.5 py-1.5 pl-9 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition">
-                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
-                </div>
-                <button id="add-category-btn" title="Add New Soundbank Category" class="px-2.5 py-1.5 bg-[#181e2e] hover:bg-[#222b40] border border-[#2a3449] rounded-xl text-slate-300 hover:text-purple-400 text-xs font-semibold flex items-center gap-1 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    <span>Category</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Global Master FX Presets Bar -->
-        <div class="bg-gradient-to-r from-[#141824] via-[#181d2c] to-[#141824] border border-[#242b3d] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-slate-200">Global FX Controls</h3>
-                    <p class="text-xs text-slate-400">Apply real-time Pitch Shifting & Speed transforms to all sounds</p>
-                </div>
-            </div>
-
-            <!-- FX Sliders -->
-            <div class="flex items-center gap-6 flex-wrap">
-                <!-- Global Pitch -->
-                <div class="flex items-center gap-2 bg-[#0e111a] px-3 py-1.5 rounded-xl border border-[#22293a]">
-                    <span class="text-xs font-semibold text-slate-400">Pitch:</span>
-                    <input id="global-pitch-slider" type="range" min="-12" max="12" step="1" value="0" class="w-24 accent-cyan-400">
+            <div class="flex items-center gap-4 flex-wrap">
+                <!-- Global Pitch with Reset -->
+                <div class="flex items-center gap-2 bg-[#151926] px-3 py-1 rounded-xl border border-[#28334a]">
+                    <span class="text-xs font-semibold text-slate-300">Pitch:</span>
+                    <input id="global-pitch-slider" type="range" min="-12" max="12" step="1" value="0" class="w-24">
                     <span id="global-pitch-val" class="text-xs font-mono font-bold text-cyan-300 w-10 text-right">0 st</span>
+                    <button id="reset-global-pitch-btn" class="reset-btn" title="Reset to Normal Pitch (0 st)">↺</button>
                 </div>
 
-                <!-- Global Speed -->
-                <div class="flex items-center gap-2 bg-[#0e111a] px-3 py-1.5 rounded-xl border border-[#22293a]">
-                    <span class="text-xs font-semibold text-slate-400">Speed:</span>
-                    <input id="global-speed-slider" type="range" min="0.5" max="2.0" step="0.05" value="1.0" class="w-24 accent-pink-500">
+                <!-- Global Speed with Reset -->
+                <div class="flex items-center gap-2 bg-[#151926] px-3 py-1 rounded-xl border border-[#28334a]">
+                    <span class="text-xs font-semibold text-slate-300">Speed:</span>
+                    <input id="global-speed-slider" type="range" min="0.5" max="2.0" step="0.05" value="1.0" class="w-24 slider-pink">
                     <span id="global-speed-val" class="text-xs font-mono font-bold text-pink-400 w-12 text-right">1.00x</span>
+                    <button id="reset-global-speed-btn" class="reset-btn" title="Reset to Normal Speed (1.00x)">↺</button>
                 </div>
 
-                <!-- Quick Presets -->
+                <!-- Presets -->
                 <div class="flex items-center gap-1.5 text-xs font-semibold">
-                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1c2232] hover:bg-[#283146] text-slate-300 hover:text-white transition" data-pitch="0" data-speed="1.0">Normal</button>
-                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1c2232] hover:bg-[#283146] text-pink-300 hover:text-white transition" data-pitch="6" data-speed="1.3">Chipmunk</button>
-                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1c2232] hover:bg-[#283146] text-cyan-300 hover:text-white transition" data-pitch="-6" data-speed="0.85">Deep Bass</button>
-                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1c2232] hover:bg-[#283146] text-amber-300 hover:text-white transition" data-pitch="0" data-speed="1.5">Nightcore</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1a2030] hover:bg-[#263048] text-slate-300 hover:text-white transition" data-pitch="0" data-speed="1.0">Normal</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1a2030] hover:bg-[#263048] text-pink-300 hover:text-white transition" data-pitch="6" data-speed="1.3">Chipmunk</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1a2030] hover:bg-[#263048] text-cyan-300 hover:text-white transition" data-pitch="-6" data-speed="0.85">Deep Bass</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#1a2030] hover:bg-[#263048] text-amber-300 hover:text-white transition" data-pitch="0" data-speed="1.5">Nightcore</button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Sound Tiles Grid -->
-        <div id="soundboard-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <!-- Dynamically populated sound cards -->
-        </div>
+    <!-- Main Content: 3 Numpad Groups -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-8 py-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center py-16 space-y-3">
-            <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
-                <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/>
-                </svg>
-            </div>
-            <h3 class="text-lg font-bold text-slate-300">No sounds found</h3>
-            <p class="text-sm text-slate-500 max-w-sm mx-auto">Upload new sound files or switch soundbank categories to see sounds.</p>
+            <!-- 1. Ctrl Group Section -->
+            <section class="numpad-frame flex flex-col space-y-4">
+                <div class="flex items-center justify-between border-b border-[#222a3d] pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-lg bg-[#f4ede2]/10 border border-[#f4ede2]/20 text-[#f4ede2] font-bold text-sm font-mono tracking-wider">CTRL</span>
+                        <h2 class="text-sm font-bold text-slate-200">Ctrl + Number Keys</h2>
+                    </div>
+                    <span class="text-xs font-mono text-slate-500">11 Keys</span>
+                </div>
+
+                <!-- 3x4 Numpad Layout Grid -->
+                <div id="grid-ctrl" class="grid grid-cols-3 gap-3">
+                    <!-- Populated dynamically: 7,8,9 / 4,5,6 / 1,2,3 / 0 (span 2), . -->
+                </div>
+            </section>
+
+            <!-- 2. Alt Group Section -->
+            <section class="numpad-frame flex flex-col space-y-4">
+                <div class="flex items-center justify-between border-b border-[#222a3d] pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-lg bg-[#f4ede2]/10 border border-[#f4ede2]/20 text-[#f4ede2] font-bold text-sm font-mono tracking-wider">ALT</span>
+                        <h2 class="text-sm font-bold text-slate-200">Alt + Number Keys</h2>
+                    </div>
+                    <span class="text-xs font-mono text-slate-500">11 Keys</span>
+                </div>
+
+                <!-- 3x4 Numpad Layout Grid -->
+                <div id="grid-alt" class="grid grid-cols-3 gap-3">
+                    <!-- Populated dynamically: 7,8,9 / 4,5,6 / 1,2,3 / 0 (span 2), . -->
+                </div>
+            </section>
+
+            <!-- 3. Ctrl + Alt Group Section -->
+            <section class="numpad-frame flex flex-col space-y-4">
+                <div class="flex items-center justify-between border-b border-[#222a3d] pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-lg bg-[#f4ede2]/10 border border-[#f4ede2]/20 text-[#f4ede2] font-bold text-sm font-mono tracking-wider">CTRL+ALT</span>
+                        <h2 class="text-sm font-bold text-slate-200">Ctrl + Alt + Keys</h2>
+                    </div>
+                    <span class="text-xs font-mono text-slate-500">10 Keys</span>
+                </div>
+
+                <!-- 3x4 Numpad Layout Grid -->
+                <div id="grid-ctrl-alt" class="grid grid-cols-3 gap-3">
+                    <!-- Populated dynamically: 7,8,9 / 4,5,6 / 1,2,3 / 0 (span 2), . -->
+                </div>
+            </section>
+
         </div>
 
     </main>
 
     <!-- Modal: Audio Device Routing & Settings -->
     <div id="settings-modal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
-        <div class="bg-[#141824] border border-[#273044] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6">
+        <div class="bg-[#121622] border border-[#2b354d] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6">
             
-            <div class="flex items-center justify-between border-b border-[#232b3d] pb-4">
+            <div class="flex items-center justify-between border-b border-[#222a3d] pb-4">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/>
                         </svg>
                     </div>
-                    <h2 class="text-lg font-bold text-white">Audio Routing & Device Settings</h2>
+                    <h2 class="text-base font-bold text-white">Audio Routing & OBS Setup</h2>
                 </div>
                 <button class="close-modal-btn text-slate-400 hover:text-white">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -211,57 +234,56 @@
                 
                 <!-- Primary Audio Device -->
                 <div class="space-y-1.5">
-                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Primary Output (Headphones / Speakers)</label>
-                    <select id="primary-device-select" class="w-full bg-[#1a2030] border border-[#2e3952] focus:border-purple-500 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">1. Primary Output (Your Headphones / Speakers)</label>
+                    <select id="primary-device-select" class="w-full bg-[#181d2a] border border-[#2e3952] focus:border-cyan-500 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none">
                         <option value="">Default Windows Playback Device</option>
                     </select>
                 </div>
 
-                <!-- Secondary Audio Device (Virtual Mic / Discord) -->
-                <div class="space-y-2 bg-[#191f2e] p-4 rounded-xl border border-[#2b354d]">
+                <!-- Secondary Audio Device (Virtual Mic / OBS / Discord) -->
+                <div class="space-y-2.5 bg-[#161a26] p-4 rounded-xl border border-[#2b354d]">
                     <div class="flex items-center justify-between">
                         <div>
-                            <label class="text-sm font-bold text-white">Dual Output / Virtual Mic Cable</label>
-                            <p class="text-xs text-slate-400">Stream audio to Discord, Zoom, or OBS simultaneously</p>
+                            <label class="text-sm font-bold text-white">2. Dual Output to Virtual Cable (OBS / Discord)</label>
+                            <p class="text-xs text-slate-400">Sends soundboard audio to your virtual cable so stream & discord can hear it</p>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input id="secondary-enabled-toggle" type="checkbox" class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
                         </label>
                     </div>
 
-                    <div id="secondary-device-container" class="space-y-1.5 pt-2">
-                        <label class="text-xs font-semibold text-slate-400">Virtual Cable Device (e.g. CABLE Input)</label>
-                        <select id="secondary-device-select" class="w-full bg-[#121622] border border-[#2a3449] rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none">
-                            <option value="">Select Virtual Cable...</option>
+                    <div id="secondary-device-container" class="space-y-1.5 pt-1">
+                        <label class="text-xs font-semibold text-cyan-400">Select: CABLE Input (VB-Audio Virtual Cable)</label>
+                        <select id="secondary-device-select" class="w-full bg-[#101420] border border-[#2a3449] rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none">
+                            <option value="">Select CABLE Input...</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- Global Panic Stop Key -->
+                <!-- Panic Stop Key -->
                 <div class="space-y-1.5">
                     <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Global Panic Stop Key</label>
                     <div class="flex items-center gap-2">
-                        <input id="panic-key-input" type="text" value="esc" class="flex-1 bg-[#1a2030] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none">
+                        <input id="panic-key-input" type="text" value="esc" class="flex-1 bg-[#181d2a] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none">
                         <button id="save-panic-key-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-semibold transition">Save</button>
                     </div>
-                    <p class="text-xs text-slate-500">Stops all audio playback instantly from any game or app.</p>
                 </div>
 
             </div>
 
-            <div class="flex items-center justify-end gap-3 border-t border-[#232b3d] pt-4">
-                <button id="test-audio-routing-btn" class="px-4 py-2 bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 text-indigo-300 rounded-xl text-sm font-bold transition">Test Sound Chime</button>
-                <button id="save-audio-settings-btn" class="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-purple-600/30">Save Routing</button>
+            <div class="flex items-center justify-end gap-3 border-t border-[#222a3d] pt-4">
+                <button id="test-audio-routing-btn" class="px-4 py-2 bg-cyan-600/20 border border-cyan-500/40 hover:bg-cyan-600/30 text-cyan-300 rounded-xl text-sm font-bold transition">Test Sound Chime</button>
+                <button id="save-audio-settings-btn" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-cyan-600/30">Save Routing</button>
             </div>
         </div>
     </div>
 
     <!-- Modal: Upload Sound File -->
     <div id="upload-modal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
-        <div class="bg-[#141824] border border-[#273044] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
-            <div class="flex items-center justify-between border-b border-[#232b3d] pb-4">
-                <h2 class="text-lg font-bold text-white">Upload New Sound Clip</h2>
+        <div class="bg-[#121622] border border-[#2b354d] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div class="flex items-center justify-between border-b border-[#222a3d] pb-4">
+                <h2 class="text-base font-bold text-white">Upload New Sound Clip</h2>
                 <button class="close-modal-btn text-slate-400 hover:text-white">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -271,8 +293,8 @@
 
             <form id="upload-sound-form" class="space-y-4">
                 <!-- Dropzone -->
-                <div id="file-dropzone" class="border-2 border-dashed border-[#2f3b54] hover:border-purple-500 rounded-xl p-6 text-center cursor-pointer transition bg-[#10141f]">
-                    <svg class="w-10 h-10 text-purple-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div id="file-dropzone" class="border-2 border-dashed border-[#2f3b54] hover:border-cyan-500 rounded-xl p-6 text-center cursor-pointer transition bg-[#10141f]">
+                    <svg class="w-10 h-10 text-cyan-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
                     <p class="text-sm font-semibold text-slate-200">Drag & Drop audio file here</p>
@@ -283,24 +305,17 @@
 
                 <div class="space-y-1.5">
                     <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Sound Display Name</label>
-                    <input id="upload-name-input" type="text" placeholder="e.g. Victory Fanfare" class="w-full bg-[#1a2030] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500">
-                </div>
-
-                <div class="space-y-1.5">
-                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Soundbank Category</label>
-                    <select id="upload-category-select" class="w-full bg-[#1a2030] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none">
-                        <!-- Populated by JS -->
-                    </select>
+                    <input id="upload-name-input" type="text" placeholder="e.g. Victory Fanfare" class="w-full bg-[#181d2a] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500">
                 </div>
 
                 <div class="space-y-1.5">
                     <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Assign Hotkey (Optional)</label>
-                    <input id="upload-hotkey-input" type="text" placeholder="e.g. ctrl+1, alt+9" class="w-full bg-[#1a2030] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-purple-500">
+                    <input id="upload-hotkey-input" type="text" placeholder="e.g. ctrl+1, alt+9" class="w-full bg-[#181d2a] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-cyan-500">
                 </div>
 
                 <div class="flex items-center justify-end gap-3 pt-2">
                     <button type="button" class="close-modal-btn px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-semibold">Cancel</button>
-                    <button type="submit" id="upload-submit-btn" class="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-purple-600/30 transition">Upload</button>
+                    <button type="submit" id="upload-submit-btn" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-cyan-600/30 transition">Upload</button>
                 </div>
             </form>
         </div>
@@ -308,15 +323,15 @@
 
     <!-- Hotkey Rebind Overlay Dialog -->
     <div id="rebind-modal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
-        <div class="bg-[#141824] border border-purple-500/50 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
-            <div class="w-12 h-12 rounded-full bg-purple-600/20 text-purple-400 flex items-center justify-center mx-auto animate-pulse">
+        <div class="bg-[#121622] border border-cyan-500/50 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+            <div class="w-12 h-12 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center mx-auto animate-pulse">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                 </svg>
             </div>
             <h3 id="rebind-title" class="text-base font-bold text-white">Press any key combination...</h3>
             <p id="rebind-sound-name" class="text-xs text-slate-400"></p>
-            <div id="captured-key-display" class="py-3 px-4 bg-[#0c0e14] border border-[#2e3952] rounded-xl text-cyan-400 font-mono font-bold text-lg min-h-[48px] flex items-center justify-center">
+            <div id="captured-key-display" class="py-3 px-4 bg-[#0b0d13] border border-[#2e3952] rounded-xl text-cyan-400 font-mono font-bold text-lg min-h-[48px] flex items-center justify-center">
                 Listening for keys...
             </div>
             <div class="flex items-center justify-center gap-2 pt-2">

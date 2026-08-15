@@ -3,9 +3,9 @@ Virtual Soundboard - Web Server & Main Backend
 ==============================================
 Flask server providing REST APIs and modern UI for:
 - Sound playback with Volume, Pitch Shift, and Playback Speed FX
-- Dual audio output routing (Speakers + Virtual Audio Cable)
-- Dynamic Hotkey rebinding & Panic Stop (Esc)
-- In-app Audio file upload and Soundbank/Category management
+- Dual audio output routing (Speakers + Virtual Audio Cable for OBS/Discord)
+- 3-Column Numpad Layout (Ctrl, Alt, Ctrl+Alt groups)
+- Global Volume Rotary Knob, Panic Stop (Esc), and Sound Upload
 """
 
 import os
@@ -19,7 +19,6 @@ from hotkey_manager import HotkeyManager
 
 app = Flask(__name__)
 
-# Disable caching for rapid UI development
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max upload
 
@@ -35,8 +34,8 @@ hotkey_manager = HotkeyManager(audio_engine, config_manager)
 # Apply stored settings to engine
 audio_engine.master_volume = config_manager.config.get('master_volume', 1.0)
 audio_engine.set_devices(
-    primary_id=config_manager.config.get('primary_device'),
-    secondary_id=config_manager.config.get('secondary_device'),
+    primary=config_manager.config.get('primary_device'),
+    secondary=config_manager.config.get('secondary_device'),
     secondary_enabled=config_manager.config.get('secondary_enabled', False)
 )
 
@@ -76,8 +75,8 @@ def api_status():
         'status': 'ok',
         'master_volume': audio_engine.master_volume,
         'panic_key': config_manager.config.get('panic_key', 'esc'),
-        'primary_device': audio_engine.primary_device,
-        'secondary_device': audio_engine.secondary_device,
+        'primary_device': audio_engine.primary_device_name,
+        'secondary_device': audio_engine.secondary_device_name,
         'secondary_enabled': audio_engine.secondary_enabled,
         'active_streams': len(audio_engine.active_streams),
         'sound_count': len(config_manager.config.get('sounds', []))
@@ -89,8 +88,8 @@ def api_get_devices():
     devices = audio_engine.list_output_devices()
     return jsonify({
         'devices': devices,
-        'current_primary': audio_engine.primary_device,
-        'current_secondary': audio_engine.secondary_device,
+        'current_primary': audio_engine.primary_device_name,
+        'current_secondary': audio_engine.secondary_device_name,
         'secondary_enabled': audio_engine.secondary_enabled
     })
 
@@ -101,11 +100,6 @@ def api_set_devices():
     primary = data.get('primary_device')
     secondary = data.get('secondary_device')
     secondary_enabled = bool(data.get('secondary_enabled', False))
-
-    if primary is not None:
-        primary = int(primary) if primary != "" and primary is not None else None
-    if secondary is not None:
-        secondary = int(secondary) if secondary != "" and secondary is not None else None
 
     audio_engine.set_devices(primary, secondary, secondary_enabled)
     config_manager.config['primary_device'] = primary
@@ -125,7 +119,6 @@ def api_set_devices():
 def api_get_sounds():
     return jsonify({
         'sounds': config_manager.config.get('sounds', []),
-        'categories': config_manager.config.get('categories', ['All']),
         'master_volume': audio_engine.master_volume,
         'panic_key': config_manager.config.get('panic_key', 'esc')
     })
@@ -142,14 +135,12 @@ def api_upload_sound():
 
     filename = secure_filename(file.filename)
     name = request.form.get('name') or os.path.splitext(filename)[0]
-    category = request.form.get('category') or 'All'
     hotkey = request.form.get('hotkey') or None
 
     valid_exts = ('.mp3', '.wav', '.ogg', '.flac')
     if not any(filename.lower().endswith(ext) for ext in valid_exts):
         return jsonify({'status': 'error', 'message': 'Supported formats: MP3, WAV, OGG, FLAC'}), 400
 
-    # Ensure unique filename if needed
     save_path = os.path.join(AUDIO_FOLDER, filename)
     counter = 1
     base_name, ext = os.path.splitext(filename)
@@ -160,20 +151,16 @@ def api_upload_sound():
 
     file.save(save_path)
 
-    # Add to config
     new_entry = config_manager.add_sound(
         filename=filename,
         name=name,
-        category=category,
         hotkey=hotkey,
         volume=1.0,
         speed=1.0,
         pitch=0.0
     )
 
-    # Refresh hotkeys
     hotkey_manager.reload_all_hotkeys()
-
     return jsonify({'status': 'success', 'sound': new_entry})
 
 
@@ -187,8 +174,6 @@ def api_edit_sound(sound_id):
     updates = {}
     if 'name' in data:
         updates['name'] = data['name']
-    if 'category' in data:
-        updates['category'] = data['category']
     if 'volume' in data:
         updates['volume'] = max(0.0, min(2.0, float(data['volume'])))
     if 'speed' in data:
@@ -198,7 +183,6 @@ def api_edit_sound(sound_id):
 
     updated = config_manager.update_sound(sound_id, updates)
 
-    # If hotkey was included in edit
     if 'hotkey' in data:
         hotkey_manager.rebind_sound_hotkey(sound_id, data['hotkey'])
 
@@ -226,10 +210,8 @@ def api_delete_sound(sound_id):
 
 @app.route('/api/play/<sound_id>', methods=['POST', 'GET'])
 def api_play_sound(sound_id):
-    # Match by ID or filename for backwards compatibility
     sound = config_manager.get_sound_by_id(sound_id)
     if not sound:
-        # Check by filename
         for s in config_manager.config.get('sounds', []):
             if s['filename'] == sound_id:
                 sound = s
@@ -240,7 +222,7 @@ def api_play_sound(sound_id):
 
     filepath = os.path.join(AUDIO_FOLDER, sound['filename'])
 
-    # Optional FX overrides from request body/params
+    # Optional FX overrides from browser play
     data = request.get_json() if request.is_json else request.args
     volume = float(data.get('volume', sound.get('volume', 1.0)))
     speed = float(data.get('speed', sound.get('speed', 1.0)))
@@ -297,40 +279,16 @@ def api_set_panic_key():
     return jsonify({'status': 'success', 'panic_key': config_manager.config.get('panic_key')})
 
 
-@app.route('/api/categories', methods=['POST'])
-def api_add_category():
-    data = request.get_json() or {}
-    name = data.get('name', '').strip()
-    if not name:
-        return jsonify({'status': 'error', 'message': 'Category name required'}), 400
-    
-    added = config_manager.add_category(name)
-    if added:
-        return jsonify({'status': 'success', 'categories': config_manager.config['categories']})
-    return jsonify({'status': 'error', 'message': 'Category already exists'}), 400
-
-
-@app.route('/api/categories/<category_name>', methods=['DELETE'])
-def api_delete_category(category_name):
-    deleted = config_manager.delete_category(category_name)
-    if deleted:
-        return jsonify({'status': 'success', 'categories': config_manager.config['categories']})
-    return jsonify({'status': 'error', 'message': 'Cannot delete category'}), 400
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Server initialization helpers
-# ─────────────────────────────────────────────────────────────────────────────
 def initialize_app():
     """Load config, preload audio files, register hotkeys and start keyboard listener."""
     print("\n" + "="*50)
-    print("🎵  VIRTUAL SOUNDBOARD 2.0 INITIALIZING...")
+    print("🎵  VIRTUAL SOUNDBOARD 2.1 INITIALIZING...")
     print("="*50)
     config_manager.sync_audio_files(config_manager.config)
     audio_engine.preload_directory()
     hotkey_manager.reload_all_hotkeys()
     hotkey_manager.start_listener()
-    print(f"Loaded {len(config_manager.config.get('sounds', []))} sounds.")
+    print(f"Loaded {len(config_manager.config.get('sounds', []))} sounds into 3 Numpad Groups.")
     print(f"Panic Key: [{config_manager.config.get('panic_key', 'esc').upper()}]")
     print("="*50 + "\n")
 

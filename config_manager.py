@@ -1,30 +1,34 @@
 """
 Config Manager for Virtual Soundboard
 =====================================
-Handles JSON persistence for sounds, soundbanks/categories, hotkeys,
-audio device routing, and FX defaults.
+Handles JSON persistence for sounds, hotkeys, audio device routing,
+and per-clip FX parameters (volume, pitch, speed).
+Organized into 3 standard numpad modifier sections: Ctrl, Alt, Ctrl+Alt.
 """
 
 import os
 import json
 import uuid
 
-DEFAULT_NUMPAD_HOTKEYS = [
-    # Ctrl + numpad
-    'ctrl+7', 'ctrl+8', 'ctrl+9',
-    'ctrl+4', 'ctrl+5', 'ctrl+6',
-    'ctrl+1', 'ctrl+2', 'ctrl+3',
-    'ctrl+0', 'ctrl+.',
-    # Alt + numpad
-    'alt+7', 'alt+8', 'alt+9',
-    'alt+4', 'alt+5', 'alt+6',
-    'alt+1', 'alt+2', 'alt+3',
-    'alt+0', 'alt+.',
-    # Ctrl + Alt + numpad
-    'ctrl+alt+7', 'ctrl+alt+8', 'ctrl+alt+9',
-    'ctrl+alt+4', 'ctrl+alt+5', 'ctrl+alt+6',
-    'ctrl+alt+1', 'ctrl+alt+2', 'ctrl+alt+3',
-    'ctrl+alt+0', 'ctrl+alt+.'
+# 3 Numpad Layout Groups (ordered as: 7, 8, 9, 4, 5, 6, 1, 2, 3, 0, .)
+NUMPAD_KEY_ORDER = [
+    # Ctrl Group
+    ('ctrl+7', '7', 'ctrl'), ('ctrl+8', '8', 'ctrl'), ('ctrl+9', '9', 'ctrl'),
+    ('ctrl+4', '4', 'ctrl'), ('ctrl+5', '5', 'ctrl'), ('ctrl+6', '6', 'ctrl'),
+    ('ctrl+1', '1', 'ctrl'), ('ctrl+2', '2', 'ctrl'), ('ctrl+3', '3', 'ctrl'),
+    ('ctrl+0', '0', 'ctrl'), ('ctrl+.', '.', 'ctrl'),
+
+    # Alt Group
+    ('alt+7', '7', 'alt'), ('alt+8', '8', 'alt'), ('alt+9', '9', 'alt'),
+    ('alt+4', '4', 'alt'), ('alt+5', '5', 'alt'), ('alt+6', '6', 'alt'),
+    ('alt+1', '1', 'alt'), ('alt+2', '2', 'alt'), ('alt+3', '3', 'alt'),
+    ('alt+0', '0', 'alt'), ('alt+.', '.', 'alt'),
+
+    # Ctrl + Alt Group
+    ('ctrl+alt+7', '7', 'ctrl+alt'), ('ctrl+alt+8', '8', 'ctrl+alt'), ('ctrl+alt+9', '9', 'ctrl+alt'),
+    ('ctrl+alt+4', '4', 'ctrl+alt'), ('ctrl+alt+5', '5', 'ctrl+alt'), ('ctrl+alt+6', '6', 'ctrl+alt'),
+    ('ctrl+alt+1', '1', 'ctrl+alt'), ('ctrl+alt+2', '2', 'ctrl+alt'), ('ctrl+alt+3', '3', 'ctrl+alt'),
+    ('ctrl+alt+0', '0', 'ctrl+alt'), ('ctrl+alt+.', '.', 'ctrl+alt')
 ]
 
 
@@ -38,19 +42,17 @@ class ConfigManager:
 
     def get_default_config(self):
         return {
-            "version": "2.0",
+            "version": "2.1",
             "master_volume": 1.0,
             "panic_key": "esc",
             "primary_device": None,
             "secondary_device": None,
             "secondary_enabled": False,
-            "active_category": "All",
-            "categories": ["All", "Memes", "Gaming", "Quotes", "Favorites"],
             "sounds": []
         }
 
     def load_config(self):
-        """Load configuration from JSON or generate initial config from audio folder."""
+        """Load configuration from JSON or initialize from audio directory."""
         config = self.get_default_config()
         if os.path.exists(self.config_path):
             try:
@@ -60,13 +62,12 @@ class ConfigManager:
             except Exception as e:
                 print(f"[ConfigManager] Error reading config: {e}. Generating new.")
         
-        # Sync with files in audio directory
         self.sync_audio_files(config)
         self.save_config(config)
         return config
 
     def sync_audio_files(self, config):
-        """Ensure all audio files in the audio folder have config entries."""
+        """Ensure all audio files in the audio folder have structured numpad config entries."""
         valid_exts = ('.mp3', '.wav', '.ogg', '.flac')
         existing_files = [f for f in os.listdir(self.audio_dir) if f.lower().endswith(valid_exts)]
         existing_files.sort()
@@ -74,36 +75,32 @@ class ConfigManager:
         sound_map = {s['filename']: s for s in config.get('sounds', [])}
         updated_sounds = []
 
-        used_hotkeys = {s['hotkey'] for s in config.get('sounds', []) if s.get('hotkey')}
+        total_keys = len(NUMPAD_KEY_ORDER)
 
         for idx, filename in enumerate(existing_files):
+            key_info = NUMPAD_KEY_ORDER[idx] if idx < total_keys else (None, None, 'custom')
+
             if filename in sound_map:
                 entry = sound_map[filename]
-                # Ensure all fields exist
                 entry.setdefault('id', str(uuid.uuid4())[:8])
                 entry.setdefault('name', os.path.splitext(filename)[0])
-                entry.setdefault('category', 'All')
+                entry.setdefault('hotkey', key_info[0])
+                entry.setdefault('symbol', key_info[1])
+                entry.setdefault('modifier', key_info[2])
                 entry.setdefault('volume', 1.0)
                 entry.setdefault('speed', 1.0)
                 entry.setdefault('pitch', 0.0)
                 entry.setdefault('order', idx)
                 updated_sounds.append(entry)
             else:
-                # Assign next unused default hotkey if available
-                assigned_hotkey = None
-                for hk in DEFAULT_NUMPAD_HOTKEYS:
-                    if hk not in used_hotkeys:
-                        assigned_hotkey = hk
-                        used_hotkeys.add(hk)
-                        break
-
                 clean_name = os.path.splitext(filename)[0]
                 new_entry = {
                     'id': str(uuid.uuid4())[:8],
                     'filename': filename,
                     'name': clean_name,
-                    'category': 'All',
-                    'hotkey': assigned_hotkey,
+                    'hotkey': key_info[0],
+                    'symbol': key_info[1],
+                    'modifier': key_info[2],
                     'volume': 1.0,
                     'speed': 1.0,
                     'pitch': 0.0,
@@ -149,20 +146,25 @@ class ConfigManager:
                 return s
         return None
 
-    def add_sound(self, filename, name=None, category="All", hotkey=None, volume=1.0, speed=1.0, pitch=0.0):
+    def add_sound(self, filename, name=None, hotkey=None, volume=1.0, speed=1.0, pitch=0.0):
         """Add a newly uploaded sound file to configuration."""
         clean_name = name or os.path.splitext(filename)[0]
         sound_id = str(uuid.uuid4())[:8]
+        
+        idx = len(self.config.get('sounds', []))
+        key_info = NUMPAD_KEY_ORDER[idx] if idx < len(NUMPAD_KEY_ORDER) else (hotkey, None, 'custom')
+
         entry = {
             'id': sound_id,
             'filename': filename,
             'name': clean_name,
-            'category': category,
-            'hotkey': hotkey,
+            'hotkey': hotkey or key_info[0],
+            'symbol': key_info[1],
+            'modifier': key_info[2],
             'volume': float(volume),
             'speed': float(speed),
             'pitch': float(pitch),
-            'order': len(self.config.get('sounds', []))
+            'order': idx
         }
         self.config['sounds'].append(entry)
         self.save_config()
@@ -185,22 +187,3 @@ class ConfigManager:
         self.config['sounds'] = [s for s in self.config['sounds'] if s['id'] != sound_id]
         self.save_config()
         return True
-
-    def add_category(self, category_name):
-        cat = category_name.strip()
-        if cat and cat not in self.config['categories']:
-            self.config['categories'].append(cat)
-            self.save_config()
-            return True
-        return False
-
-    def delete_category(self, category_name):
-        if category_name in self.config['categories'] and category_name != 'All':
-            self.config['categories'].remove(category_name)
-            # Reassign any sound in this category to 'All'
-            for s in self.config['sounds']:
-                if s.get('category') == category_name:
-                    s['category'] = 'All'
-            self.save_config()
-            return True
-        return False

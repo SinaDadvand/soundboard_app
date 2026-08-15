@@ -1,12 +1,11 @@
 """
-End-to-End Test Suite for Virtual Soundboard 2.0
-================================================
-Validates all Flask endpoints, Audio Engine integrations,
+End-to-End Test Suite for Virtual Soundboard Numpad Pro
+======================================================
+Validates Flask endpoints, Audio Engine integrations,
 Device settings, Hotkey rebinds, FX modifications, and Panic Stop.
 """
 
 import os
-import json
 import unittest
 from app import app, config_manager, audio_engine, hotkey_manager
 
@@ -22,6 +21,8 @@ class TestSoundboardE2E(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn(b'Virtual Soundboard', res.data)
         self.assertIn(b'STOP ALL', res.data)
+        self.assertIn(b'grid-ctrl', res.data)
+        self.assertIn(b'grid-alt', res.data)
 
     def test_02_api_status(self):
         res = self.client.get('/api/status')
@@ -39,37 +40,25 @@ class TestSoundboardE2E(unittest.TestCase):
         self.assertIn('devices', data)
         self.assertIsInstance(data['devices'], list)
 
-        # Test setting devices
         post_res = self.client.post('/api/devices', json={
             'primary_device': None,
-            'secondary_device': None,
-            'secondary_enabled': False
+            'secondary_device': 'CABLE Input (VB-Audio Virtual Cable)',
+            'secondary_enabled': True
         })
         self.assertEqual(post_res.status_code, 200)
 
-    def test_04_api_sounds_and_categories(self):
+    def test_04_api_sounds(self):
         res = self.client.get('/api/sounds')
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
         self.assertIn('sounds', data)
-        self.assertIn('categories', data)
         self.assertGreater(len(data['sounds']), 0)
-
-        # Test adding and removing category
-        cat_res = self.client.post('/api/categories', json={'name': 'TestSoundbank'})
-        self.assertEqual(cat_res.status_code, 200)
-        self.assertIn('TestSoundbank', cat_res.get_json()['categories'])
-
-        del_res = self.client.delete('/api/categories/TestSoundbank')
-        self.assertEqual(del_res.status_code, 200)
-        self.assertNotIn('TestSoundbank', del_res.get_json()['categories'])
 
     def test_05_edit_sound_and_fx(self):
         sounds = config_manager.config.get('sounds', [])
         self.assertGreater(len(sounds), 0)
         first_id = sounds[0]['id']
 
-        # Edit volume, pitch, speed
         edit_res = self.client.post(f'/api/sounds/{first_id}/edit', json={
             'volume': 0.85,
             'speed': 1.15,
@@ -86,7 +75,7 @@ class TestSoundboardE2E(unittest.TestCase):
         first_id = sounds[0]['id']
 
         rebind_res = self.client.post(f'/api/sounds/{first_id}/rebind', json={
-            'hotkey': 'ctrl+alt+k'
+            'hotkey': 'ctrl+7'
         })
         self.assertEqual(rebind_res.status_code, 200)
         self.assertEqual(rebind_res.get_json()['status'], 'success')
@@ -95,7 +84,6 @@ class TestSoundboardE2E(unittest.TestCase):
         sounds = config_manager.config.get('sounds', [])
         first_id = sounds[0]['id']
 
-        # Play sound with FX parameters
         play_res = self.client.post(f'/api/play/{first_id}', json={
             'volume': 0.1,
             'speed': 1.2,
@@ -103,11 +91,9 @@ class TestSoundboardE2E(unittest.TestCase):
         })
         self.assertEqual(play_res.status_code, 200)
 
-        # Stop specific sound
         stop_single = self.client.post(f'/api/sounds/{first_id}/stop')
         self.assertEqual(stop_single.status_code, 200)
 
-        # Panic stop
         stop_all = self.client.post('/api/stop')
         self.assertEqual(stop_all.status_code, 200)
 

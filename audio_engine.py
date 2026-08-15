@@ -1,11 +1,12 @@
 """
 Audio Engine for Virtual Soundboard
 ===================================
-Provides high-performance audio playback with:
-- Dual-device routing (Primary speakers + Secondary Virtual Audio Cable/Mic)
-- Real-time Volume, Pitch shifting, and Playback Speed FX
-- Instant panic stop / individual clip stop
-- Device enumeration and hot-swapping
+High-performance audio playback engine supporting:
+- Dual-device simultaneous routing (Speakers + Virtual Audio Cable for OBS/Discord)
+- Automatic sample rate conversion & channel mapping for WASAPI / DirectSound / MME
+- Real-time volume, pitch shifting, and playback speed manipulation
+- Panic stop & individual sound stop
+- Device resolution by name and fallback
 """
 
 import os
@@ -19,13 +20,13 @@ from scipy import signal
 class AudioEngine:
     def __init__(self, audio_dir=None):
         self.audio_dir = audio_dir
-        self.audio_cache = {}  # filename -> (data: np.ndarray, samplerate: int)
-        self.active_streams = []  # list of active sd.OutputStream or stop events
+        self.audio_cache = {}  # filepath -> (data: np.ndarray, samplerate: int)
+        self.active_streams = []
         self.lock = threading.Lock()
 
         self.master_volume = 1.0  # 0.0 to 1.0
-        self.primary_device = None  # None = system default
-        self.secondary_device = None  # None = disabled
+        self.primary_device_name = None
+        self.secondary_device_name = None
         self.secondary_enabled = False
 
     def list_output_devices(self):
@@ -51,12 +52,45 @@ class AudioEngine:
             print(f"[AudioEngine] Error querying devices: {e}")
         return devices
 
-    def set_devices(self, primary_id=None, secondary_id=None, secondary_enabled=False):
+    def resolve_device_id(self, device_spec):
+        """Resolve a device index by int ID or by name matching."""
+        if device_spec is None or device_spec == "":
+            return None
+
+        # If already int
+        if isinstance(device_spec, int):
+            try:
+                sd.query_devices(device_spec)
+                return device_spec
+            except Exception:
+                pass
+
+        spec_str = str(device_spec).lower()
+        devices = self.list_output_devices()
+        # Sort devices so WASAPI and MME are preferred over DirectSound for virtual cables
+        api_priority = {'windows wasapi': 0, 'mme': 1, 'windows directsound': 2, 'windows wdm-ks': 3}
+        devices.sort(key=lambda d: api_priority.get(d['hostapi'].lower(), 99))
+
+        # 1. Exact match
+        for d in devices:
+            if d['display_name'].lower() == spec_str or d['name'].lower() == spec_str:
+                return d['id']
+            if str(d['id']) == spec_str:
+                return d['id']
+
+        # 2. Substring match
+        for d in devices:
+            if spec_str in d['display_name'].lower() or spec_str in d['name'].lower():
+                return d['id']
+
+        return None
+
+    def set_devices(self, primary=None, secondary=None, secondary_enabled=False):
         """Configure primary and secondary output devices."""
         with self.lock:
-            self.primary_device = primary_id
-            self.secondary_device = secondary_id
-            self.secondary_enabled = secondary_enabled and (secondary_id is not None)
+            self.primary_device_name = primary
+            self.secondary_device_name = secondary
+            self.secondary_enabled = bool(secondary_enabled) and (secondary is not None)
 
     def load_audio(self, filepath):
         """Load and cache audio file as float32 stereo array."""
@@ -74,6 +108,7 @@ class AudioEngine:
         elif data.shape[1] > 2:
             data = data[:, :2]
 
+        data = np.ascontiguousarray(data, dtype=np.float32)
         self.audio_cache[filepath] = (data, sr)
         return data, sr
 
@@ -93,7 +128,7 @@ class AudioEngine:
 
     @staticmethod
     def apply_speed(data, speed_factor):
-        """Change playback speed and pitch together (varispeed / tape speed)."""
+        """Change playback speed and pitch together (varispeed)."""
         if speed_factor == 1.0 or speed_factor <= 0:
             return data
         
@@ -101,19 +136,17 @@ class AudioEngine:
         if num_samples <= 0:
             return data
         
-        # Resample both channels using scipy signal resample
         left = signal.resample(data[:, 0], num_samples)
         right = signal.resample(data[:, 1], num_samples)
-        return np.column_stack((left, right)).astype(np.float32)
+        out = np.column_stack((left, right)).astype(np.float32)
+        return np.ascontiguousarray(out, dtype=np.float32)
 
     @staticmethod
     def _phase_vocoder(d, rate, hop_length=512):
-        """Simple phase vocoder for single-channel time stretching."""
+        """Phase vocoder for single-channel time stretching."""
         n_fft = 2048
-        # Short-time Fourier transform
         _, _, stft = signal.stft(d, nperseg=n_fft, noverlap=n_fft - hop_length)
         
-        # Phase vocoder time stretch
         time_steps = np.arange(0, stft.shape[1], rate, dtype=np.float32)
         time_steps = time_steps[time_steps < stft.shape[1] - 1]
         
@@ -141,19 +174,14 @@ class AudioEngine:
             return data
         
         pitch_ratio = 2.0 ** (semitones / 12.0)
-        
-        # Method: Resample by pitch_ratio, then time-stretch by pitch_ratio to restore original length
-        # 1. Resample
         new_len = int(len(data) / pitch_ratio)
         resampled_l = signal.resample(data[:, 0], new_len)
         resampled_r = signal.resample(data[:, 1], new_len)
         
-        # 2. Time stretch back
         try:
             stretched_l = cls._phase_vocoder(resampled_l, 1.0 / pitch_ratio)
             stretched_r = cls._phase_vocoder(resampled_r, 1.0 / pitch_ratio)
             
-            # Match lengths
             target_len = len(data)
             out_l = np.zeros(target_len, dtype=np.float32)
             out_r = np.zeros(target_len, dtype=np.float32)
@@ -162,51 +190,49 @@ class AudioEngine:
             out_l[:copy_len] = stretched_l[:copy_len]
             out_r[:copy_len] = stretched_r[:copy_len]
             
-            return np.column_stack((out_l, out_r))
+            out = np.column_stack((out_l, out_r))
+            return np.ascontiguousarray(out, dtype=np.float32)
         except Exception:
-            # Fallback to varispeed if phase vocoder fails
-            return np.column_stack((resampled_l, resampled_r))
+            out = np.column_stack((resampled_l, resampled_r))
+            return np.ascontiguousarray(out, dtype=np.float32)
 
     def process_audio(self, raw_data, volume=1.0, speed=1.0, pitch_semitones=0.0):
         """Apply volume, pitch, and speed transformations."""
         processed = raw_data.copy()
 
-        # Apply Pitch Shift if requested
         if pitch_semitones != 0:
             processed = self.apply_pitch_shift(processed, pitch_semitones)
 
-        # Apply Playback Speed
         if speed != 1.0 and speed > 0:
             processed = self.apply_speed(processed, speed)
 
-        # Apply Volume scaling
         eff_vol = max(0.0, min(2.0, float(volume) * float(self.master_volume)))
         if eff_vol != 1.0:
             processed = processed * eff_vol
 
-        # Soft clip to prevent distortion
         np.clip(processed, -1.0, 1.0, out=processed)
-        return processed
+        return np.ascontiguousarray(processed, dtype=np.float32)
 
     def play(self, filepath, volume=1.0, speed=1.0, pitch_semitones=0.0, sound_id=None):
-        """Play a sound file across configured devices."""
+        """Play audio across configured devices with automatic sample-rate & channel adaptation."""
         try:
             data, sr = self.load_audio(filepath)
         except Exception as e:
             print(f"[AudioEngine] Failed to load audio {filepath}: {e}")
             return False
 
-        # Apply effects
         audio_to_play = self.process_audio(data, volume=volume, speed=speed, pitch_semitones=pitch_semitones)
 
-        # Determine target devices
         devices_to_play = []
         with self.lock:
-            devices_to_play.append(self.primary_device)
-            if self.secondary_enabled and self.secondary_device is not None:
-                devices_to_play.append(self.secondary_device)
+            p_id = self.resolve_device_id(self.primary_device_name)
+            devices_to_play.append(p_id)
 
-        # Launch playback in background threads
+            if self.secondary_enabled and self.secondary_device_name is not None:
+                s_id = self.resolve_device_id(self.secondary_device_name)
+                if s_id is not None and s_id != p_id:
+                    devices_to_play.append(s_id)
+
         stop_event = threading.Event()
         stream_entry = {
             'sound_id': sound_id or filepath,
@@ -216,14 +242,39 @@ class AudioEngine:
 
         def _play_on_device(dev_id):
             try:
-                # Use blocking stream with stop event checking
+                target_sr = sr
+                target_audio = audio_to_play
+                target_channels = 2
+
+                if dev_id is not None:
+                    try:
+                        dev_info = sd.query_devices(dev_id)
+                        dev_def_sr = int(dev_info.get('default_samplerate', sr))
+                        dev_max_ch = dev_info.get('max_output_channels', 2)
+
+                        if dev_def_sr != sr and dev_def_sr > 0:
+                            target_sr = dev_def_sr
+                            new_len = int(len(audio_to_play) * target_sr / sr)
+                            target_audio = signal.resample(audio_to_play, new_len).astype(np.float32)
+
+                        if dev_max_ch == 1:
+                            target_audio = target_audio[:, 0:1]
+                            target_channels = 1
+                        elif dev_max_ch > 2 and dev_info.get('hostapi') == 0:  # MME 16ch
+                            target_audio = np.tile(target_audio, (1, dev_max_ch // 2))
+                            target_channels = dev_max_ch
+                    except Exception as dev_err:
+                        print(f"[AudioEngine] Device query notice on {dev_id}: {dev_err}")
+
+                target_audio = np.ascontiguousarray(target_audio, dtype=np.float32)
                 chunk_size = 2048
-                with sd.OutputStream(samplerate=sr, channels=2, device=dev_id, dtype='float32') as stream:
+
+                with sd.OutputStream(samplerate=target_sr, channels=target_channels, device=dev_id, dtype='float32') as stream:
                     pos = 0
-                    total = len(audio_to_play)
+                    total = len(target_audio)
                     while pos < total and not stop_event.is_set():
                         end = min(pos + chunk_size, total)
-                        chunk = audio_to_play[pos:end]
+                        chunk = target_audio[pos:end]
                         stream.write(chunk)
                         pos = end
             except Exception as ex:
@@ -237,7 +288,6 @@ class AudioEngine:
             stream_entry['threads'].append(t)
             t.start()
 
-        # Thread to clean up entry once done
         def _cleanup():
             for t in stream_entry['threads']:
                 t.join()

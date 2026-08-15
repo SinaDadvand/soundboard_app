@@ -3,27 +3,21 @@
   "master_volume": 0.9,
   "panic_key": "esc",
   "primary_device": null,
-  "secondary_device": null,
-  "secondary_enabled": false,
-  "active_category": "All",
-  "categories": [
-    "All",
-    "Memes",
-    "Gaming",
-    "Quotes",
-    "Favorites"
-  ],
+  "secondary_device": "CABLE Input (VB-Audio Virtual Cable)",
+  "secondary_enabled": true,
   "sounds": [
     {
       "id": "0fad7ef9",
       "filename": "All Day.mp3",
       "name": "All Day",
       "category": "All",
-      "hotkey": "ctrl+alt+k",
+      "hotkey": "ctrl+7",
       "volume": 0.85,
       "speed": 1.15,
       "pitch": 3.0,
-      "order": 0
+      "order": 0,
+      "symbol": "7",
+      "modifier": "ctrl"
     },
     {
       "id": "f9cc34e9",
@@ -31,10 +25,12 @@
       "name": "Choppa!",
       "category": "All",
       "hotkey": "ctrl+8",
-      "volume": 1.0,
-      "speed": 1.0,
+      "volume": 0.6,
+      "speed": 0.7,
       "pitch": 0.0,
-      "order": 1
+      "order": 1,
+      "symbol": "8",
+      "modifier": "ctrl"
     },
     {
       "id": "47e94523",
@@ -42,10 +38,12 @@
       "name": "Damn Son!",
       "category": "All",
       "hotkey": "ctrl+9",
-      "volume": 1.0,
-      "speed": 1.0,
+      "volume": 0.75,
+      "speed": 0.5,
       "pitch": 0.0,
-      "order": 2
+      "order": 2,
+      "symbol": "9",
+      "modifier": "ctrl"
     },
     {
       "id": "f7cc34b4",
@@ -56,7 +54,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 3
+      "order": 3,
+      "symbol": "4",
+      "modifier": "ctrl"
     },
     {
       "id": "44b4d199",
@@ -65,9 +65,11 @@
       "category": "All",
       "hotkey": "ctrl+5",
       "volume": 1.0,
-      "speed": 1.0,
-      "pitch": 0.0,
-      "order": 4
+      "speed": 1.3,
+      "pitch": -9.0,
+      "order": 4,
+      "symbol": "5",
+      "modifier": "ctrl"
     },
     {
       "id": "f275b353",
@@ -78,7 +80,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 5
+      "order": 5,
+      "symbol": "6",
+      "modifier": "ctrl"
     },
     {
       "id": "a83bb40d",
@@ -89,7 +93,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 6
+      "order": 6,
+      "symbol": "1",
+      "modifier": "ctrl"
     },
     {
       "id": "05566af8",
@@ -100,7 +106,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 7
+      "order": 7,
+      "symbol": "2",
+      "modifier": "ctrl"
     },
     {
       "id": "9d208c5b",
@@ -111,7 +119,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 8
+      "order": 8,
+      "symbol": "3",
+      "modifier": "ctrl"
     },
     {
       "id": "7547b2ba",
@@ -122,7 +132,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 9
+      "order": 9,
+      "symbol": "0",
+      "modifier": "ctrl"
     },
     {
       "id": "1d54e976",
@@ -133,7 +145,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 10
+      "order": 10,
+      "symbol": ".",
+      "modifier": "ctrl"
     },
     {
       "id": "ef8f3dd1",
@@ -144,7 +158,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 11
+      "order": 11,
+      "symbol": "7",
+      "modifier": "alt"
     },
     {
       "id": "50426e43",
@@ -155,7 +171,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 12
+      "order": 12,
+      "symbol": "8",
+      "modifier": "alt"
     },
     {
       "id": "7f491af6",
@@ -166,7 +184,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 13
+      "order": 13,
+      "symbol": "9",
+      "modifier": "alt"
     },
     {
       "id": "0482715e",
@@ -174,10 +194,12 @@
       "name": "Mario",
       "category": "All",
       "hotkey": "alt+4",
-      "volume": 1.0,
+      "volume": 0.3,
       "speed": 1.0,
-      "pitch": 0.0,
-      "order": 14
+      "pitch": -8.0,
+      "order": 14,
+      "symbol": "4",
+      "modifier": "alt"
     },
     {
       "id": "a4b1e2bd",
@@ -188,7 +210,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 15
+      "order": 15,
+      "symbol": "5",
+      "modifier": "alt"
     },
     {
       "id": "c67ef29d",
@@ -199,7 +223,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 16
+      "order": 16,
+      "symbol": "6",
+      "modifier": "alt"
     },
     {
       "id": "b4289a55",
@@ -210,7 +236,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 17
+      "order": 17,
+      "symbol": "1",
+      "modifier": "alt"
     },
     {
       "id": "66a36f09",
@@ -221,7 +249,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 18
+      "order": 18,
+      "symbol": "2",
+      "modifier": "alt"
     },
     {
       "id": "ef29a719",
@@ -232,7 +262,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 19
+      "order": 19,
+      "symbol": "3",
+      "modifier": "alt"
     },
     {
       "id": "09eda1c9",
@@ -243,7 +275,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 20
+      "order": 20,
+      "symbol": "0",
+      "modifier": "alt"
     },
     {
       "id": "f2075c6e",
@@ -254,7 +288,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 21
+      "order": 21,
+      "symbol": ".",
+      "modifier": "alt"
     },
     {
       "id": "6da7fcdf",
@@ -265,7 +301,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 22
+      "order": 22,
+      "symbol": "7",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "ad0dfc52",
@@ -276,7 +314,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 23
+      "order": 23,
+      "symbol": "8",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "ec25c237",
@@ -287,7 +327,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 24
+      "order": 24,
+      "symbol": "9",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "dc346d1b",
@@ -298,7 +340,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 25
+      "order": 25,
+      "symbol": "4",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "1c014ca0",
@@ -309,7 +353,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 26
+      "order": 26,
+      "symbol": "5",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "db3d0ba8",
@@ -320,7 +366,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 27
+      "order": 27,
+      "symbol": "6",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "8350b3f4",
@@ -331,7 +379,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 28
+      "order": 28,
+      "symbol": "1",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "264ceb59",
@@ -342,7 +392,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 29
+      "order": 29,
+      "symbol": "2",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "b2318140",
@@ -353,7 +405,9 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 30
+      "order": 30,
+      "symbol": "3",
+      "modifier": "ctrl+alt"
     },
     {
       "id": "40787545",
@@ -364,7 +418,17 @@
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 31
+      "order": 31,
+      "symbol": "0",
+      "modifier": "ctrl+alt"
     }
+  ],
+  "active_category": "All",
+  "categories": [
+    "All",
+    "Memes",
+    "Gaming",
+    "Quotes",
+    "Favorites"
   ]
 }
