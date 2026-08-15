@@ -1,17 +1,19 @@
 /**
  * Virtual Soundboard Numpad Pro - Frontend Controller
  * ==================================================
+ * - 3 Stacked Vertical Numpad Groups (Full width, clear legible cards)
+ * - 3 Hardware Rotary Knobs on top (Volume Gold, Pitch Cyan, Speed Pink)
  * - 2 Instant Output Destination Toggles (Headset & Virtual Cable)
- * - Compact single-line keycaps (Hotkey Left, Track Title Right)
- * - Gold Rotary Knob with Dot indicator
- * - Vertical Global FX Rack on the side
- * - High-contrast slider tracks & individual reset buttons
+ * - Micro Presets Box
+ * - Individual card volume/pitch/speed FX with individual ↺ reset buttons
  */
 
 document.addEventListener('DOMContentLoaded', () => {
     // State
     let sounds = [];
     let masterVolume = 1.0;
+    let globalPitch = 0;       // -12 to +12 semitones
+    let globalSpeed = 1.0;      // 0.5 to 2.0x
     let panicKey = 'esc';
     let headsetEnabled = true;
     let cableEnabled = true;
@@ -29,22 +31,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleHeadsetBtn = document.getElementById('toggle-headset-btn');
     const toggleCableBtn = document.getElementById('toggle-cable-btn');
 
-    // Rotary Knob Elements
+    // 3 Knobs Elements
     const volumeKnob = document.getElementById('volume-knob');
-    const knobIndicator = document.getElementById('knob-indicator');
+    const volumeIndicator = document.getElementById('volume-indicator');
     const masterVolVal = document.getElementById('master-volume-val');
-    const masterMuteBtn = document.getElementById('master-mute-btn');
+
+    const pitchKnob = document.getElementById('pitch-knob');
+    const pitchIndicator = document.getElementById('pitch-indicator');
+    const globalPitchVal = document.getElementById('global-pitch-val');
+    const resetPitchKnobBtn = document.getElementById('reset-pitch-knob-btn');
+
+    const speedKnob = document.getElementById('speed-knob');
+    const speedIndicator = document.getElementById('speed-indicator');
+    const globalSpeedVal = document.getElementById('global-speed-val');
+    const resetSpeedKnobBtn = document.getElementById('reset-speed-knob-btn');
+
+    const fxPresetBtns = document.querySelectorAll('.fx-preset-btn');
     const panicStopBtn = document.getElementById('panic-stop-btn');
     const panicKeyBadge = document.getElementById('panic-key-badge');
-
-    // Vertical Global FX Elements
-    const globalPitchSlider = document.getElementById('global-pitch-slider');
-    const globalPitchVal = document.getElementById('global-pitch-val');
-    const resetGlobalPitchBtn = document.getElementById('reset-global-pitch-btn');
-    const globalSpeedSlider = document.getElementById('global-speed-slider');
-    const globalSpeedVal = document.getElementById('global-speed-val');
-    const resetGlobalSpeedBtn = document.getElementById('reset-global-speed-btn');
-    const fxPresetBtns = document.querySelectorAll('.fx-preset-btn');
 
     // Modals
     const settingsModal = document.getElementById('settings-modal');
@@ -82,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSounds();
         await loadDevices();
         setupEventListeners();
-        setupRotaryKnob();
+        setupKnobs();
         setupDestinationToggles();
     }
 
@@ -94,7 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
             masterVolume = data.master_volume !== undefined ? data.master_volume : 1.0;
             panicKey = data.panic_key || 'esc';
 
-            updateKnobVisual(masterVolume);
+            updateVolumeKnobVisual(masterVolume);
+            updatePitchKnobVisual(globalPitch);
+            updateSpeedKnobVisual(globalSpeed);
+
             panicKeyBadge.textContent = panicKey.toUpperCase();
             panicKeyInput.value = panicKey;
 
@@ -109,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/devices');
             const data = await res.json();
             
-            primaryDeviceSelect.innerHTML = '<option value="">Default Headphones / WF-1000XM4</option>';
+            primaryDeviceSelect.innerHTML = '<option value="">Sony Headset / Wireless Stereo Headset</option>';
             secondaryDeviceSelect.innerHTML = '<option value="">CABLE Input (VB-Audio Virtual Cable)</option>';
 
             data.devices.forEach(dev => {
@@ -131,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Render Compact Numpad Grids
+    // Render Stacked Numpad Grids
     // ─────────────────────────────────────────────────────────────────────────
     function renderNumpadGrids() {
         gridCtrl.innerHTML = '';
@@ -141,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         soundCounter.textContent = `${sounds.length} sounds`;
 
         sounds.forEach(sound => {
-            const card = createCompactNumpadCard(sound);
+            const card = createNumpadCard(sound);
             const mod = (sound.modifier || '').toLowerCase();
 
             if (mod === 'ctrl') {
@@ -154,14 +161,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function createCompactNumpadCard(sound) {
+    function createNumpadCard(sound) {
         const card = document.createElement('div');
         card.id = `card-${sound.id}`;
         
         const isZeroKey = sound.symbol === '0' || (sound.hotkey && sound.hotkey.endsWith('0'));
         const spanClass = isZeroKey ? 'col-span-2' : 'col-span-1';
 
-        card.className = `numpad-key p-2.5 flex flex-col justify-between gap-2 ${spanClass} ${
+        card.className = `numpad-key p-3 flex flex-col justify-between gap-2.5 ${spanClass} ${
             activePlayingIds.has(sound.id) ? 'playing' : ''
         }`;
 
@@ -172,42 +179,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const curSpeed = sound.speed || 1.0;
 
         card.innerHTML = `
-            <!-- Single Row Header: Hotkey Left, Track Title Right -->
-            <div class="flex items-center justify-between gap-1.5 w-full">
+            <!-- Single Row Header: Hotkey Left, Full Sound Title Right -->
+            <div class="flex items-center justify-between gap-2 w-full">
                 <button class="hotkey-badge" title="Click to rebind hotkey">${hotkeyText}</button>
-                <h3 class="font-bold text-slate-200 text-xs truncate max-w-[120px] text-right" title="${sound.name}">${sound.name}</h3>
+                <h3 class="font-bold text-slate-100 text-xs md:text-sm truncate text-right flex-1" title="${sound.name}">${sound.name}</h3>
             </div>
 
             <!-- Action Row: Play/Stop + FX Drawer Button -->
             <div class="flex items-center justify-between gap-2 pt-1 border-t border-[#222a3d]">
-                <button class="play-btn-neon play-btn px-2 py-1 text-[11px] font-bold flex items-center gap-1 shadow-sm active:scale-95 transition" title="${isPlaying ? 'Stop' : 'Play Sound'}">
+                <button class="play-btn-neon play-btn px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition" title="${isPlaying ? 'Stop' : 'Play Sound'}">
                     ${isPlaying ? `
-                        <svg class="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 24 24">
                             <rect x="6" y="6" width="12" height="12" rx="2"/>
                         </svg>
                         <span>Stop</span>
                     ` : `
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z"/>
                         </svg>
                         <span>Play</span>
                     `}
                 </button>
 
-                <button class="toggle-fx-btn text-[10px] text-slate-400 hover:text-cyan-400 font-semibold transition flex items-center gap-0.5">
-                    <span>FX</span>
-                    <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button class="toggle-fx-btn text-xs text-slate-400 hover:text-cyan-400 font-semibold transition flex items-center gap-1">
+                    <span>FX Controls</span>
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
             </div>
 
             <!-- Sliders Drawer with High-Visibility Tracks & Individual Resets -->
-            <div class="fx-panel hidden space-y-1.5 pt-1.5 border-t border-[#222a3d] text-xs text-slate-400">
+            <div class="fx-panel hidden space-y-2 pt-2 border-t border-[#222a3d] text-xs text-slate-400">
                 <!-- Volume -->
                 <div class="space-y-0.5">
-                    <div class="flex items-center justify-between text-[10px]">
-                        <span class="font-semibold text-slate-300">Vol:</span>
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="font-semibold text-slate-300">Volume:</span>
                         <div class="flex items-center gap-1">
                             <span class="vol-label font-mono text-cyan-300 font-bold">${Math.round(curVol * 100)}%</span>
                             <button class="reset-vol-btn reset-btn" title="Reset Volume to 100%">↺</button>
@@ -218,8 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <!-- Pitch -->
                 <div class="space-y-0.5">
-                    <div class="flex items-center justify-between text-[10px]">
-                        <span class="font-semibold text-slate-300">Pitch:</span>
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="font-semibold text-slate-300">Pitch Shift:</span>
                         <div class="flex items-center gap-1">
                             <span class="pitch-val font-mono text-cyan-300 font-bold">${curPitch > 0 ? '+' : ''}${curPitch}st</span>
                             <button class="reset-pitch-btn reset-btn" title="Reset Pitch to 0 st">↺</button>
@@ -230,8 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <!-- Speed -->
                 <div class="space-y-0.5">
-                    <div class="flex items-center justify-between text-[10px]">
-                        <span class="font-semibold text-slate-300">Speed:</span>
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="font-semibold text-slate-300">Playback Speed:</span>
                         <div class="flex items-center gap-1">
                             <span class="speed-val font-mono text-pink-400 font-bold">${curSpeed.toFixed(2)}x</span>
                             <button class="reset-speed-btn reset-btn" title="Reset Speed to 1.00x">↺</button>
@@ -364,11 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Playback Logic
     // ─────────────────────────────────────────────────────────────────────────
     async function playFromBrowser(sound) {
-        const gPitch = parseInt(globalPitchSlider.value) || 0;
-        const gSpeed = parseFloat(globalSpeedSlider.value) || 1.0;
-
-        const effectivePitch = (sound.pitch || 0) + gPitch;
-        const effectiveSpeed = (sound.speed || 1.0) * gSpeed;
+        const effectivePitch = (sound.pitch || 0) + globalPitch;
+        const effectiveSpeed = (sound.speed || 1.0) * globalSpeed;
         const effectiveVol = (sound.volume !== undefined ? sound.volume : 1.0);
 
         setCardPlayingVisual(sound.id, true);
@@ -407,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const playBtn = card.querySelector('.play-btn');
             if (playBtn) {
                 playBtn.innerHTML = `
-                    <svg class="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 24 24">
                         <rect x="6" y="6" width="12" height="12" rx="2"/>
                     </svg>
                     <span>Stop</span>
@@ -418,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const playBtn = card.querySelector('.play-btn');
             if (playBtn) {
                 playBtn.innerHTML = `
-                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>
                     </svg>
                     <span>Play</span>
@@ -443,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const playBtn = c.querySelector('.play-btn');
             if (playBtn) {
                 playBtn.innerHTML = `
-                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>
                     </svg>
                     <span>Play</span>
@@ -471,64 +475,120 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Gold Rotary Knob with Dot
+    // 3 Rotary Knobs: Volume, Pitch, Speed
     // ─────────────────────────────────────────────────────────────────────────
-    function updateKnobVisual(vol) {
+    function updateVolumeKnobVisual(vol) {
         const angle = -135 + (vol * 270);
         volumeKnob.style.transform = `rotate(${angle}deg)`;
         masterVolVal.textContent = `${Math.round(vol * 100)}%`;
     }
 
-    function setupRotaryKnob() {
-        let isDraggingKnob = false;
-        let startY = 0;
-        let startVol = masterVolume;
+    function updatePitchKnobVisual(pitch) {
+        // -12 to +12 -> angle -135 to +135
+        const norm = (pitch + 12) / 24.0;
+        const angle = -135 + (norm * 270);
+        pitchKnob.style.transform = `rotate(${angle}deg)`;
+        globalPitchVal.textContent = `${pitch > 0 ? '+' : ''}${pitch} st`;
+    }
 
-        volumeKnob.addEventListener('mousedown', (e) => {
-            isDraggingKnob = true;
-            startY = e.clientY;
-            startVol = masterVolume;
-            e.preventDefault();
-        });
+    function updateSpeedKnobVisual(speed) {
+        // 0.5 to 2.0 -> angle -135 to +135
+        const norm = (speed - 0.5) / 1.5;
+        const angle = -135 + (norm * 270);
+        speedKnob.style.transform = `rotate(${angle}deg)`;
+        globalSpeedVal.textContent = `${speed.toFixed(2)}x`;
+    }
 
-        window.addEventListener('mousemove', (e) => {
-            if (!isDraggingKnob) return;
-            const deltaY = startY - e.clientY;
-            let newVol = Math.max(0.0, Math.min(1.0, startVol + (deltaY / 120)));
-            masterVolume = newVol;
-            updateKnobVisual(newVol);
-        });
+    function setupKnobs() {
+        // Helper to bind rotary drag & wheel
+        function bindKnob(element, initialValGetter, minVal, maxVal, step, onUpdate, onCommit) {
+            let isDragging = false;
+            let startY = 0;
+            let startVal = 0;
 
-        window.addEventListener('mouseup', async () => {
-            if (isDraggingKnob) {
-                isDraggingKnob = false;
+            element.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startY = e.clientY;
+                startVal = initialValGetter();
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const deltaY = startY - e.clientY;
+                const range = maxVal - minVal;
+                let newVal = startVal + (deltaY / 120) * range;
+                newVal = Math.max(minVal, Math.min(maxVal, newVal));
+                if (step >= 1) newVal = Math.round(newVal);
+                onUpdate(newVal);
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    if (onCommit) onCommit();
+                }
+            });
+
+            element.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const cur = initialValGetter();
+                const delta = (e.deltaY < 0 ? 1 : -1) * (step || 0.05);
+                let newVal = Math.max(minVal, Math.min(maxVal, cur + delta));
+                if (step >= 1) newVal = Math.round(newVal);
+                onUpdate(newVal);
+                if (onCommit) onCommit();
+            });
+        }
+
+        // 1. Volume Knob
+        bindKnob(
+            volumeKnob,
+            () => masterVolume,
+            0.0, 1.0, 0.05,
+            (val) => { masterVolume = val; updateVolumeKnobVisual(val); },
+            async () => {
                 await fetch('/api/master_volume', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ volume: masterVolume })
                 });
             }
+        );
+
+        // 2. Pitch Knob
+        bindKnob(
+            pitchKnob,
+            () => globalPitch,
+            -12, 12, 1,
+            (val) => { globalPitch = val; updatePitchKnobVisual(val); }
+        );
+
+        resetPitchKnobBtn.addEventListener('click', () => {
+            globalPitch = 0;
+            updatePitchKnobVisual(0);
         });
 
-        volumeKnob.addEventListener('wheel', async (e) => {
-            e.preventDefault();
-            const delta = e.deltaY < 0 ? 0.05 : -0.05;
-            masterVolume = Math.max(0.0, Math.min(1.0, masterVolume + delta));
-            updateKnobVisual(masterVolume);
-            await fetch('/api/master_volume', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ volume: masterVolume })
-            });
+        // 3. Speed Knob
+        bindKnob(
+            speedKnob,
+            () => globalSpeed,
+            0.5, 2.0, 0.05,
+            (val) => { globalSpeed = val; updateSpeedKnobVisual(val); }
+        );
+
+        resetSpeedKnobBtn.addEventListener('click', () => {
+            globalSpeed = 1.0;
+            updateSpeedKnobVisual(1.0);
         });
 
-        masterMuteBtn.addEventListener('click', async () => {
-            masterVolume = masterVolume > 0 ? 0 : 1.0;
-            updateKnobVisual(masterVolume);
-            await fetch('/api/master_volume', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ volume: masterVolume })
+        // Presets
+        fxPresetBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                globalPitch = parseInt(btn.dataset.pitch) || 0;
+                globalSpeed = parseFloat(btn.dataset.speed) || 1.0;
+                updatePitchKnobVisual(globalPitch);
+                updateSpeedKnobVisual(globalSpeed);
             });
         });
     }
@@ -612,40 +672,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         panicStopBtn.addEventListener('click', panicStopAll);
 
-        // Vertical Global Pitch
-        globalPitchSlider.addEventListener('input', (e) => {
-            const val = e.target.value;
-            globalPitchVal.textContent = `${val > 0 ? '+' : ''}${val} st`;
-        });
-
-        resetGlobalPitchBtn.addEventListener('click', () => {
-            globalPitchSlider.value = 0;
-            globalPitchVal.textContent = '0 st';
-        });
-
-        // Vertical Global Speed
-        globalSpeedSlider.addEventListener('input', (e) => {
-            globalSpeedVal.textContent = `${parseFloat(e.target.value).toFixed(2)}x`;
-        });
-
-        resetGlobalSpeedBtn.addEventListener('click', () => {
-            globalSpeedSlider.value = 1.0;
-            globalSpeedVal.textContent = '1.00x';
-        });
-
-        // Presets
-        fxPresetBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const pitch = btn.dataset.pitch;
-                const speed = btn.dataset.speed;
-                globalPitchSlider.value = pitch;
-                globalPitchVal.textContent = `${pitch > 0 ? '+' : ''}${pitch} st`;
-                globalSpeedSlider.value = speed;
-                globalSpeedVal.textContent = `${parseFloat(speed).toFixed(2)}x`;
-            });
-        });
-
-        // Modals
         openSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
         openUploadBtn.addEventListener('click', () => uploadModal.classList.remove('hidden'));
 

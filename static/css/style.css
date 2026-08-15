@@ -6,9 +6,9 @@
     --border-keycap: #2b354d;
     --cream-accent: #f4ede2;
     --gold-knob: #d4af37;
+    --cyan-knob: #06b6d4;
+    --pink-knob: #f43f5e;
     --neon-blue: #38bdf8;
-    --neon-cyan: #06b6d4;
-    --neon-purple: #8b5cf6;
     --accent-red: #ef4444;
     --text-primary: #f8fafc;
     --text-muted: #94a3b8;
@@ -44,20 +44,20 @@ body {
     background: #3b4754;
 }
 
-/* Numpad Section Enclosure */
-.numpad-frame {
+/* Numpad Group Section Enclosure */
+.numpad-group-container {
     background: #111520;
     border: 1px solid #222a3d;
     border-radius: 16px;
-    padding: 1rem;
+    padding: 1.25rem;
     box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Compact Numpad Keycap Card */
+/* Numpad Keycap Card */
 .numpad-key {
     background: linear-gradient(180deg, #1b202e 0%, #151924 100%);
     border: 1px solid var(--border-keycap);
-    border-radius: 10px;
+    border-radius: 12px;
     box-shadow: 0 3px 5px -1px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
@@ -68,12 +68,12 @@ body {
     background: linear-gradient(180deg, #242b3d 0%, #1c2232 100%);
     border-color: rgba(56, 189, 248, 0.45);
     transform: translateY(-1.5px);
-    box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.15);
+    box-shadow: 0 6px 14px -2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.15);
 }
 
 .numpad-key.playing {
-    border-color: var(--neon-cyan);
-    box-shadow: 0 0 16px rgba(6, 182, 212, 0.5), inset 0 0 8px rgba(6, 182, 212, 0.25);
+    border-color: var(--cyan-knob);
+    box-shadow: 0 0 18px rgba(6, 182, 212, 0.5), inset 0 0 8px rgba(6, 182, 212, 0.25);
     animation: keyPulse 1.2s infinite ease-in-out;
 }
 
@@ -86,10 +86,10 @@ body {
 .hotkey-badge {
     background: #0f131d;
     border: 1px solid #334155;
-    padding: 2px 6px;
-    border-radius: 5px;
+    padding: 3px 7px;
+    border-radius: 6px;
     font-family: 'Courier New', Courier, monospace;
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     font-weight: 700;
     color: #38bdf8;
     cursor: pointer;
@@ -124,8 +124,8 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border-radius: 12px;
+    padding: 5px 11px;
+    border-radius: 10px;
     font-size: 0.75rem;
     font-weight: 700;
     border: 1px solid #2b354d;
@@ -139,7 +139,7 @@ body {
     background: rgba(6, 182, 212, 0.15);
     border-color: #06b6d4;
     color: #38bdf8;
-    box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
 }
 
 .dest-toggle-btn.active .dest-led {
@@ -155,27 +155,52 @@ body {
     transition: all 0.18s ease;
 }
 
-/* Rotary Volume Knob with DOT Indicator */
-.rotary-knob-container {
+/* Rotary Knobs Control Panel (Volume, Pitch, Speed) */
+.rotary-knob-cluster {
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: #141824;
+    gap: 12px;
+    background: #131724;
     border: 1px solid #28334a;
-    padding: 5px 12px;
-    border-radius: 14px;
+    padding: 6px 14px;
+    border-radius: 16px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.knob-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    user-select: none;
 }
 
 .rotary-knob {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #ecd27c 0%, #b8932c 60%, #876816 100%);
-    border: 2px solid #5a440c;
     position: relative;
     cursor: pointer;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.35);
     transition: transform 0.05s linear;
+}
+
+/* Gold Volume Knob */
+.knob-gold {
+    background: radial-gradient(circle at 35% 35%, #ecd27c 0%, #b8932c 60%, #876816 100%);
+    border: 2px solid #5a440c;
+}
+
+/* Cyan Pitch Knob */
+.knob-cyan {
+    background: radial-gradient(circle at 35% 35%, #67e8f9 0%, #0891b2 60%, #155e75 100%);
+    border: 2px solid #0e3b4a;
+}
+
+/* Pink Speed Knob */
+.knob-pink {
+    background: radial-gradient(circle at 35% 35%, #fda4af 0%, #e11d48 60%, #881337 100%);
+    border: 2px solid #4c0519;
 }
 
 /* Circular Dot on Knob Edge */
@@ -185,7 +210,7 @@ body {
     left: 50%;
     width: 5px;
     height: 5px;
-    background: #241902;
+    background: #11141c;
     border-radius: 50%;
     transform: translateX(-50%);
     box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.8), 0 0.5px 0.5px rgba(255, 255, 255, 0.4);
@@ -233,16 +258,6 @@ input[type=range].slider-pink::-webkit-slider-thumb {
 input[type=range].slider-cyan::-webkit-slider-thumb {
     background: #06b6d4;
     box-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
-}
-
-/* Vertical Sliders for FX Sidebar */
-input[type=range].vertical-slider {
-    writing-mode: bt-lr; /* IE */
-    -webkit-appearance: slider-vertical; /* WebKit */
-    width: 18px;
-    height: 120px;
-    padding: 0;
-    cursor: pointer;
 }
 
 /* Panic Button Glowing Accent */

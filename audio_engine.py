@@ -3,7 +3,7 @@ Audio Engine for Virtual Soundboard
 ===================================
 High-performance audio playback engine supporting:
 - Independent Headset / Virtual Cable destination toggle buttons
-- Simultaneous multi-stream routing (Headphones + VB-Audio Virtual Cable)
+- Simultaneous multi-stream routing (Sony Headset/WF-1000XM4 + VB-Audio Virtual Cable)
 - Automatic sample rate conversion & channel mapping for WASAPI / DirectSound / MME
 - Real-time volume, pitch shifting, and playback speed manipulation
 - Panic stop & individual sound stop
@@ -57,7 +57,7 @@ class AudioEngine:
         return devices
 
     def resolve_headphone_device(self):
-        """Find the user's primary headphones/headset (e.g. WF-1000XM4 or default)."""
+        """Find the user's primary headphones/headset (e.g. Sony Headset, WF-1000XM4, or default)."""
         devices = self.list_output_devices()
         
         # 1. If explicit device name configured
@@ -67,12 +67,16 @@ class AudioEngine:
                 if spec_str in d['display_name'].lower() or spec_str in d['name'].lower():
                     return d['id']
 
-        # 2. Auto-detect Bluetooth/USB headset or headphones
+        # 2. Auto-detect Sony Headset / WF-1000XM4 / Headphones (WASAPI preferred)
         for d in devices:
             d_name = d['name'].lower()
-            if any(k in d_name for k in ['1000xm4', 'headphones', 'headset']) and 'cable' not in d_name:
-                if 'wasapi' in d['hostapi'].lower() or 'mme' in d['hostapi'].lower():
+            if any(k in d_name for k in ['sony headset', '1000xm4', 'wireless stereo headset', 'headphones', 'headset']) and 'cable' not in d_name:
+                if 'wasapi' in d['hostapi'].lower():
                     return d['id']
+        for d in devices:
+            d_name = d['name'].lower()
+            if any(k in d_name for k in ['sony headset', '1000xm4', 'wireless stereo headset', 'headphones', 'headset']) and 'cable' not in d_name:
+                return d['id']
 
         # 3. Fallback to speakers
         for d in devices:
@@ -83,7 +87,7 @@ class AudioEngine:
         return None
 
     def resolve_cable_device(self):
-        """Find VB-Audio CABLE Input."""
+        """Find VB-Audio CABLE Input for streaming directly to OBS / Discord."""
         devices = self.list_output_devices()
         
         if self.secondary_device_name:
@@ -92,7 +96,7 @@ class AudioEngine:
                 if spec_str in d['display_name'].lower() or spec_str in d['name'].lower():
                     return d['id']
 
-        # Auto-detect CABLE Input (prioritize WASAPI then MME)
+        # Prioritize WASAPI CABLE Input (dev 25) then MME CABLE Input (dev 9)
         for d in devices:
             if 'cable input' in d['name'].lower() and 'wasapi' in d['hostapi'].lower():
                 return d['id']
@@ -113,6 +117,7 @@ class AudioEngine:
         with self.lock:
             self.headset_enabled = bool(headset_enabled)
             self.cable_enabled = bool(cable_enabled)
+        print(f"[AudioEngine] Output routing updated -> Headset: {self.headset_enabled}, Virtual Cable: {self.cable_enabled}")
 
     def load_audio(self, filepath):
         """Load and cache audio file as float32 stereo array."""
@@ -250,7 +255,6 @@ class AudioEngine:
                 if c_dev is not None and c_dev not in devices_to_play:
                     devices_to_play.append(c_dev)
 
-        # Fallback if both disabled
         if not devices_to_play:
             devices_to_play.append(self.resolve_headphone_device())
 
@@ -297,6 +301,12 @@ class AudioEngine:
                         pos = end
             except Exception as ex:
                 print(f"[AudioEngine] Playback notice on device {dev_id}: {ex}")
+                if dev_id is not None:
+                    try:
+                        with sd.OutputStream(samplerate=sr, channels=2, device=None, dtype='float32') as fallback_stream:
+                            fallback_stream.write(np.ascontiguousarray(audio_to_play, dtype=np.float32))
+                    except Exception:
+                        pass
 
         with self.lock:
             self.active_streams.append(stream_entry)
