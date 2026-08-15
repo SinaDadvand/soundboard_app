@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 #
 # PyInstaller spec for Virtual Soundboard 2
-# Generates dist\VirtualSoundboard2.exe
+# Generates dist\VirtualSoundboard2.exe with new Chevron Neon Icon
 #
 
 block_cipher = None
@@ -14,8 +14,8 @@ a = Analysis(
         ('templates', 'templates'),
         ('static/css', 'static/css'),
         ('static/js', 'static/js'),
-        ('neon_v_soundboard_icon.ico', '.'),
-        ('Virtual Soundboard Icon.ico', '.'),
+        ('app_icon.ico', '.'),
+        ('app_icon.png', '.'),
         ('soundboard_config.json', '.'),
     ],
     hiddenimports=[
@@ -41,7 +41,6 @@ a = Analysis(
         # Hotkeys & config
         'keyboard',
         'dotenv',
-        'python_dotenv',
     ],
     hookspath=[],
     hooksconfig={},
@@ -74,5 +73,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='neon_v_soundboard_icon.ico',
+    icon='app_icon.ico',
 )

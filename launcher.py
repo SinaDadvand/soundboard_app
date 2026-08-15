@@ -1,13 +1,12 @@
 """
-Virtual Soundboard Launcher
-===========================
-A lightweight tkinter wrapper that:
+Virtual Soundboard Launcher - Pro Edition
+=========================================
+Modern Tkinter desktop wrapper that:
   - Starts the Flask soundboard server in a background thread
-  - Shows server status with a live indicator
-  - "Open Soundboard in Browser" → http://127.0.0.1:5001
-  - "Open Audio Folder"          → Windows Explorer on the audio directory
-
-Works both as a plain Python script and as a PyInstaller .exe bundle.
+  - Displays real-time server status with pulsing indicator
+  - "Open Soundboard Dashboard" -> http://127.0.0.1:5001
+  - "Open Audio Library Folder" -> Windows Explorer on audio files directory
+  - Dark neon aesthetic matching the web UI
 """
 import sys
 import os
@@ -19,56 +18,40 @@ import tkinter.messagebox as msgbox
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Path resolution
-# When frozen by PyInstaller --onefile:
-#   sys._MEIPASS  → temp dir that holds the bundled Python code + assets
-#   sys.executable → path to the running .exe
-# When running as a plain script both point to the script's own directory.
 # ─────────────────────────────────────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
-    _BUNDLE  = sys._MEIPASS                         # bundled code lives here
-    _EXE_DIR = os.path.dirname(sys.executable)      # .exe lives here
+    _BUNDLE = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    _EXE_DIR = os.path.dirname(sys.executable)
 else:
-    _BUNDLE  = os.path.dirname(os.path.abspath(__file__))
+    _BUNDLE = os.path.dirname(os.path.abspath(__file__))
     _EXE_DIR = _BUNDLE
 
-# Audio folder always sits NEXT TO the exe so the user can manage their files.
-AUDIO_FOLDER = os.path.join(_EXE_DIR, 'static', 'audio')
-SERVER_URL   = 'http://127.0.0.1:5001'
+# Audio folder resolution
+audio_candidates = [
+    os.path.join(_EXE_DIR, 'static', 'audio'),
+    os.path.join(os.path.dirname(_EXE_DIR), 'static', 'audio'),
+    os.path.join(_BUNDLE, 'static', 'audio')
+]
+AUDIO_FOLDER = next((p for p in audio_candidates if os.path.exists(p) and len(os.listdir(p)) > 0), audio_candidates[0])
+SERVER_URL = 'http://127.0.0.1:5001'
 
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Flask server
+# Flask server thread
 # ─────────────────────────────────────────────────────────────────────────────
 def _run_server():
-    """Import app.py and run the Flask server.  Intended for a daemon thread."""
+    """Import app.py and run the Flask server in a daemon thread."""
     if _BUNDLE not in sys.path:
         sys.path.insert(0, _BUNDLE)
 
     try:
         import app as sb
     except Exception as exc:
-        msgbox.showerror('Import error', f'Could not load soundboard app:\n{exc}')
+        msgbox.showerror('Import Error', f'Could not load soundboard app:\n{exc}')
         return
 
-    # Override AUDIO_FOLDER so the server reads from the exe's directory,
-    # not from the temporary PyInstaller extraction folder.
-    sb.AUDIO_FOLDER = AUDIO_FOLDER
-    os.makedirs(AUDIO_FOLDER, exist_ok=True)
-
-    # Initialize soundboard services (audio engine, hotkeys, config)
-    try:
-        if hasattr(sb, 'initialize_app'):
-            sb.initialize_app()
-        else:
-            sb.load_sounds()
-            sb.setup_hotkeys()
-            sb.start_keyboard_listener()
-    except Exception as e:
-        print(f"[Launcher] Init notice: {e}")
-
-    # Suppress werkzeug request-level logs in the background thread
     import logging
     logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
@@ -78,132 +61,151 @@ def _run_server():
 def _port_open(host='127.0.0.1', port=5001) -> bool:
     """Return True if the Flask server is accepting connections."""
     try:
-        with socket.create_connection((host, port), timeout=0.5):
+        with socket.create_connection((host, port), timeout=0.4):
             return True
     except OSError:
         return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GUI
+# Modern Dark Launcher GUI
 # ─────────────────────────────────────────────────────────────────────────────
 class SoundboardLauncher(tk.Tk):
-    # ── Design tokens ────────────────────────────────────────────────────────
-    C_BG     = '#0d0d1a'
-    C_CARD   = '#15152b'
-    C_ACCENT = '#7c6fe0'
-    C_GREEN  = '#34d399'
-    C_GREY   = '#7070a0'
-    C_TEXT   = '#dde0f5'
-    C_DIV    = '#1e1e3a'
+    # Modern Design Palette
+    C_BG = '#0b0d13'
+    C_SURFACE = '#121622'
+    C_BORDER = '#222a3d'
+    C_CYAN = '#06b6d4'
+    C_CYAN_HOVER = '#0891b2'
+    C_KEYCAP = '#181d2a'
+    C_KEYCAP_HOVER = '#22293b'
+    C_GREEN = '#10b981'
+    C_GOLD = '#d4af37'
+    C_TEXT = '#f8fafc'
+    C_MUTED = '#94a3b8'
 
     def __init__(self):
         super().__init__()
-        self.title('Virtual Soundboard')
-        self.geometry('370x295')
+        self.title('Soundboard Pro 2.1')
+        self.geometry('400x330')
         self.resizable(False, False)
         self.configure(bg=self.C_BG)
         self.protocol('WM_DELETE_WINDOW', self._quit)
 
+        # Set Window Icon
+        icon_candidates = [
+            os.path.join(_EXE_DIR, 'app_icon.ico'),
+            os.path.join(_BUNDLE, 'app_icon.ico'),
+            os.path.join(_EXE_DIR, 'neon_v_soundboard_icon.ico'),
+            os.path.join(_BUNDLE, 'neon_v_soundboard_icon.ico')
+        ]
+        for icon_path in icon_candidates:
+            if os.path.exists(icon_path):
+                try:
+                    self.iconbitmap(icon_path)
+                    break
+                except Exception:
+                    pass
+
         self._build_ui()
 
-        # Start the Flask server in a daemon thread
+        # Start Flask background server
         threading.Thread(target=_run_server, daemon=True).start()
 
-        # Begin polling until the server accepts connections
+        # Poll until server is ready
         self._poll_server()
 
-    # ── UI construction ───────────────────────────────────────────────────────
     def _build_ui(self):
-        H_PAD = {'padx': 28}
+        # Outer Container Frame
+        container = tk.Frame(self, bg=self.C_SURFACE, highlightbackground=self.C_BORDER, highlightthickness=1)
+        container.pack(fill='both', expand=True, padx=16, pady=16)
 
-        # Title
-        tk.Label(self,
-                 text='🎵  Virtual Soundboard',
-                 font=('Segoe UI', 16, 'bold'),
-                 fg=self.C_ACCENT, bg=self.C_BG) \
-          .pack(anchor='w', pady=(26, 0), **H_PAD)
+        # Header Title Bar
+        header = tk.Frame(container, bg=self.C_SURFACE)
+        header.pack(fill='x', padx=18, pady=(18, 10))
 
-        # Status row
-        row = tk.Frame(self, bg=self.C_BG)
-        row.pack(anchor='w', pady=(9, 2), **H_PAD)
+        title_frame = tk.Frame(header, bg=self.C_SURFACE)
+        title_frame.pack(side='left')
 
-        self._dot = tk.Label(row, text='●', font=('Segoe UI', 12),
-                             fg='#2a2a44', bg=self.C_BG)
+        tk.Label(title_frame, text='⚡ Soundboard Pro',
+                 font=('Segoe UI', 15, 'bold'),
+                 fg=self.C_TEXT, bg=self.C_SURFACE).pack(side='left')
+
+        badge = tk.Label(title_frame, text=' NUMPAD ',
+                         font=('Segoe UI', 8, 'bold'),
+                         fg=self.C_GOLD, bg='#241c09',
+                         highlightbackground='#5a440c', highlightthickness=1)
+        badge.pack(side='left', padx=(8, 0))
+
+        # Status Pill Box
+        status_box = tk.Frame(container, bg='#0e111a', highlightbackground=self.C_BORDER, highlightthickness=1)
+        status_box.pack(fill='x', padx=18, pady=(0, 14))
+
+        status_row = tk.Frame(status_box, bg='#0e111a')
+        status_row.pack(fill='x', padx=10, pady=8)
+
+        self._dot = tk.Label(status_row, text='●', font=('Segoe UI', 11),
+                             fg='#475569', bg='#0e111a')
         self._dot.pack(side='left')
 
-        self._status_lbl = tk.Label(row, text='Starting server…',
-                                    font=('Segoe UI', 10),
-                                    fg=self.C_GREY, bg=self.C_BG)
-        self._status_lbl.pack(side='left', padx=(7, 0))
+        self._status_lbl = tk.Label(status_row, text='Initializing background engine…',
+                                    font=('Segoe UI', 9, 'bold'),
+                                    fg=self.C_MUTED, bg='#0e111a')
+        self._status_lbl.pack(side='left', padx=(6, 0))
 
-        # Clickable URL (visible once server is running)
-        self._url_lbl = tk.Label(self, text='',
-                                  font=('Courier', 9),
-                                  fg=self.C_ACCENT, bg=self.C_BG,
+        self._url_lbl = tk.Label(status_row, text='',
+                                  font=('Courier New', 9, 'bold'),
+                                  fg=self.C_CYAN, bg='#0e111a',
                                   cursor='hand2')
-        self._url_lbl.pack(anchor='w', **H_PAD)
+        self._url_lbl.pack(side='right')
         self._url_lbl.bind('<Button-1>', lambda _: self._open_browser())
 
-        # Divider
-        tk.Frame(self, bg=self.C_DIV, height=1) \
-          .pack(fill='x', padx=28, pady=14)
+        # Action Buttons
+        btn_box = tk.Frame(container, bg=self.C_SURFACE)
+        btn_box.pack(fill='x', padx=18, pady=(4, 10))
 
-        # Primary action – open browser
-        self._btn(
-            '🌐   Open Soundboard in Browser',
-            self.C_ACCENT, '#ffffff', self._open_browser
-        ).pack(fill='x', padx=28, pady=(0, 10))
+        # 1. Primary Button: Open in Browser
+        self._create_button(
+            btn_box,
+            text='🌐   Launch Web Dashboard',
+            bg=self.C_CYAN,
+            fg='#ffffff',
+            hover_bg=self.C_CYAN_HOVER,
+            cmd=self._open_browser
+        ).pack(fill='x', pady=(0, 8))
 
-        # Secondary action – open audio folder
-        self._btn(
-            '📁   Open Audio Folder',
-            self.C_CARD, self.C_TEXT, self._open_folder,
-            border_color='#262648'
-        ).pack(fill='x', padx=28)
+        # 2. Secondary Button: Open Audio Folder
+        self._create_button(
+            btn_box,
+            text='📁   Open Audio Library Folder',
+            bg=self.C_KEYCAP,
+            fg='#38bdf8',
+            hover_bg=self.C_KEYCAP_HOVER,
+            border_color=self.C_BORDER,
+            cmd=self._open_folder
+        ).pack(fill='x')
 
-        # Footer
-        tk.Label(self,
-                 text='Server stops when this window is closed.',
+        # Footer Notice
+        tk.Label(container,
+                 text='Soundboard runs in background while this window is open.',
                  font=('Segoe UI', 8),
-                 fg='#3a3a5a', bg=self.C_BG) \
-          .pack(side='bottom', pady=10)
+                 fg='#475569', bg=self.C_SURFACE) \
+          .pack(side='bottom', pady=(0, 10))
 
-    def _btn(self, label: str, bg: str, fg: str, cmd,
-             border_color: str = None) -> tk.Frame:
-        """Return a styled flat button wrapped in a thin border frame."""
-        outer = tk.Frame(self, bg=border_color or bg)
-        inner = tk.Frame(outer, bg=bg)
-        inner.pack(fill='both', padx=1, pady=1)
+    def _create_button(self, parent, text, bg, fg, hover_bg, cmd, border_color=None):
+        border = tk.Frame(parent, bg=border_color or bg)
+        btn = tk.Button(border, text=text, command=cmd,
+                        bg=bg, fg=fg,
+                        activebackground=hover_bg, activeforeground='#ffffff',
+                        font=('Segoe UI', 10, 'bold'),
+                        relief='flat', bd=0, pady=10,
+                        cursor='hand2')
+        btn.pack(fill='both', padx=1, pady=1)
 
-        b = tk.Button(inner, text=label, command=cmd,
-                      bg=bg, fg=fg,
-                      activebackground=self.C_ACCENT,
-                      activeforeground='white',
-                      font=('Segoe UI', 11, 'bold'),
-                      relief='flat', bd=0, pady=12,
-                      cursor='hand2')
-        b.pack(fill='both')
+        btn.bind('<Enter>', lambda e: btn.config(bg=hover_bg))
+        btn.bind('<Leave>', lambda e: btn.config(bg=bg))
+        return border
 
-        lighter = self._lighten(bg, 28)
-        b.bind('<Enter>', lambda e, w=b: w.config(bg=lighter))
-        b.bind('<Leave>', lambda e, w=b, c=bg: w.config(bg=c))
-        return outer
-
-    @staticmethod
-    def _lighten(hex_col: str, amount: int = 28) -> str:
-        """Return a slightly lighter hex colour for hover effect."""
-        try:
-            r = int(hex_col[1:3], 16)
-            g = int(hex_col[3:5], 16)
-            b = int(hex_col[5:7], 16)
-            return (f'#{min(r + amount, 255):02x}'
-                    f'{min(g + amount, 255):02x}'
-                    f'{min(b + amount, 255):02x}')
-        except Exception:
-            return hex_col
-
-    # ── Actions ────────────────────────────────────────────────────────────────
     def _open_browser(self):
         webbrowser.open(SERVER_URL)
 
@@ -213,19 +215,16 @@ class SoundboardLauncher(tk.Tk):
 
     def _quit(self):
         self.destroy()
-        # Force-kill the process so Flask's background thread also stops
         os._exit(0)
 
-    # ── Server status polling ──────────────────────────────────────────────────
     def _poll_server(self):
         if _port_open():
             self._dot.config(fg=self.C_GREEN)
-            self._status_lbl.config(text='Server running', fg=self.C_GREEN)
+            self._status_lbl.config(text='Server Active', fg=self.C_GREEN)
             self._url_lbl.config(text=SERVER_URL)
         else:
-            self.after(500, self._poll_server)
+            self.after(400, self._poll_server)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     SoundboardLauncher().mainloop()
