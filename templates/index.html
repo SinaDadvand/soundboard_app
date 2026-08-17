@@ -1,28 +1,349 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Virtual Soundboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Virtual Soundboard Numpad Pro</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Space Grotesk', 'Inter', 'sans-serif'],
+                        mono: ['Courier New', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ timestamp }}">
 </head>
-<body>
-    <div class="container">
-        <h1>Virtual Soundboard</h1>
-        <div class="soundboard" id="soundboard">
-            {% for audio in audio_files %}
-            <div class="sound-button" data-sound="{{ audio }}">
-                <span class="sound-name">{{ audio.split('.')[0] }}</span>
-                <small class="key-hint"></small>
+<body class="bg-[#0b0d13] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white">
+
+    <!-- Top Navigation Control Panel Header -->
+    <header class="sticky top-0 z-40 bg-[#0f131d]/95 backdrop-blur-md border-b border-[#1f2738] px-4 lg:px-8 py-3">
+        <div class="max-w-[1500px] mx-auto flex items-center justify-between gap-4 flex-wrap">
+            
+            <!-- Brand & Status + Output Selectors -->
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-[#d4af37] via-[#06b6d4] to-[#38bdf8] p-[1px] shadow-lg shadow-cyan-500/10">
+                        <div class="w-full h-full bg-[#111520] rounded-[11px] flex items-center justify-center">
+                            <svg class="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <h1 class="text-sm font-bold tracking-tight text-white">Soundboard Pro</h1>
+                            <span class="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded bg-[#f4ede2]/10 text-[#f4ede2] border border-[#f4ede2]/20">Numpad</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span id="sound-counter-badge">32 sounds</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Destination Selectors (Headset & Virtual Cable Buttons) -->
+                <div class="flex items-center gap-1.5 bg-[#121622] p-1 rounded-xl border border-[#222a3d]">
+                    <button id="toggle-headset-btn" class="dest-toggle-btn active" title="Toggle audio output to Headset / Sony Headset">
+                        <span class="dest-led"></span>
+                        <span>🎧 Headset</span>
+                    </button>
+                    <button id="toggle-cable-btn" class="dest-toggle-btn active" title="Toggle audio output to VB-Audio Virtual Cable (OBS / Discord)">
+                        <span class="dest-led"></span>
+                        <span>🎙️ Virtual Cable (OBS)</span>
+                    </button>
+                </div>
             </div>
-            {% endfor %}
+
+            <!-- Top Hardware Knobs Cluster (Volume, Pitch, Speed, Echo, Reverb) -->
+            <div class="rotary-knob-cluster">
+                
+                <!-- 1. Volume Knob (Gold) -->
+                <div class="knob-unit">
+                    <span class="text-[9px] font-bold uppercase tracking-wider text-[#d4af37]">Vol</span>
+                    <div id="volume-knob" class="rotary-knob knob-gold" title="Drag or scroll to adjust Master Volume">
+                        <div id="volume-indicator" class="rotary-dot"></div>
+                    </div>
+                    <span id="master-volume-val" class="text-[10px] font-mono font-bold text-[#d4af37]">100%</span>
+                </div>
+
+                <div class="w-[1px] h-8 bg-[#28334a]"></div>
+
+                <!-- 2. Pitch Knob (Cyan) -->
+                <div class="knob-unit">
+                    <div class="flex items-center gap-0.5">
+                        <span class="text-[9px] font-bold uppercase tracking-wider text-cyan-400">Pitch</span>
+                        <button id="reset-pitch-knob-btn" class="reset-btn text-[8px] px-1" title="Reset Pitch to 0 st">↺</button>
+                    </div>
+                    <div id="pitch-knob" class="rotary-knob knob-cyan" title="Drag or scroll to adjust Pitch (±12 st)">
+                        <div id="pitch-indicator" class="rotary-dot"></div>
+                    </div>
+                    <span id="global-pitch-val" class="text-[10px] font-mono font-bold text-cyan-300">0 st</span>
+                </div>
+
+                <div class="w-[1px] h-8 bg-[#28334a]"></div>
+
+                <!-- 3. Speed Knob (Pink) -->
+                <div class="knob-unit">
+                    <div class="flex items-center gap-0.5">
+                        <span class="text-[9px] font-bold uppercase tracking-wider text-pink-400">Speed</span>
+                        <button id="reset-speed-knob-btn" class="reset-btn text-[8px] px-1" title="Reset Speed to 1.00x">↺</button>
+                    </div>
+                    <div id="speed-knob" class="rotary-knob knob-pink" title="Drag or scroll to adjust Speed (0.5x - 2.0x)">
+                        <div id="speed-indicator" class="rotary-dot"></div>
+                    </div>
+                    <span id="global-speed-val" class="text-[10px] font-mono font-bold text-pink-400">1.00x</span>
+                </div>
+
+                <div class="w-[1px] h-8 bg-[#28334a]"></div>
+
+                <!-- 4. Echo Knob (Amber) -->
+                <div class="knob-unit">
+                    <div class="flex items-center gap-0.5">
+                        <span class="text-[9px] font-bold uppercase tracking-wider text-amber-400">Echo</span>
+                        <button id="reset-echo-knob-btn" class="reset-btn text-[8px] px-1" title="Reset Echo to 0%">↺</button>
+                    </div>
+                    <div id="echo-knob" class="rotary-knob knob-amber" title="Drag or scroll to adjust Echo Delay">
+                        <div id="echo-indicator" class="rotary-dot"></div>
+                    </div>
+                    <span id="global-echo-val" class="text-[10px] font-mono font-bold text-amber-400">0%</span>
+                </div>
+
+                <div class="w-[1px] h-8 bg-[#28334a]"></div>
+
+                <!-- 5. Reverb Knob (Purple) -->
+                <div class="knob-unit">
+                    <div class="flex items-center gap-0.5">
+                        <span class="text-[9px] font-bold uppercase tracking-wider text-purple-400">Reverb</span>
+                        <button id="reset-reverb-knob-btn" class="reset-btn text-[8px] px-1" title="Reset Reverb to 0%">↺</button>
+                    </div>
+                    <div id="reverb-knob" class="rotary-knob knob-purple" title="Drag or scroll to adjust Room Reverb">
+                        <div id="reverb-indicator" class="rotary-dot"></div>
+                    </div>
+                    <span id="global-reverb-val" class="text-[10px] font-mono font-bold text-purple-400">0%</span>
+                </div>
+
+            </div>
+
+            <!-- Right Controls: Micro Presets, Panic Stop & Actions -->
+            <div class="flex items-center gap-3">
+                
+                <!-- Micro Presets Box -->
+                <div class="bg-[#121622] p-1 rounded-xl border border-[#222a3d] flex items-center gap-1 text-[10px] font-semibold">
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#181d2a] hover:bg-[#232b40] text-slate-300 hover:text-white transition" data-pitch="0" data-speed="1.0" data-echo="0" data-reverb="0">Normal</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#181d2a] hover:bg-[#232b40] text-pink-300 hover:text-white transition" data-pitch="6" data-speed="1.3" data-echo="0" data-reverb="0">Chipmunk</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#181d2a] hover:bg-[#232b40] text-cyan-300 hover:text-white transition" data-pitch="-6" data-speed="0.85" data-echo="0" data-reverb="0">Deep Bass</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#181d2a] hover:bg-[#232b40] text-amber-300 hover:text-white transition" data-pitch="0" data-speed="1.0" data-echo="0.5" data-reverb="0.4">Stadium</button>
+                    <button class="fx-preset-btn px-2 py-1 rounded-lg bg-[#181d2a] hover:bg-[#232b40] text-purple-300 hover:text-white transition" data-pitch="-3" data-speed="0.8" data-echo="0.6" data-reverb="0.7">Space Cave</button>
+                </div>
+
+                <!-- Panic STOP ALL Button -->
+                <button id="panic-stop-btn" class="panic-btn flex items-center gap-1 px-3 py-1.5 rounded-xl text-white font-bold text-xs tracking-wide cursor-pointer shadow-lg active:scale-95 transition">
+                    <span class="w-1.5 h-1.5 rounded-sm bg-white animate-ping"></span>
+                    <span>STOP</span>
+                    <kbd id="panic-key-badge" class="bg-black/40 border border-red-300/40 text-red-200 text-[10px] px-1 py-0.2 rounded font-mono font-bold">ESC</kbd>
+                </button>
+
+                <!-- Add Sound Button -->
+                <button id="open-upload-modal-btn" class="flex items-center gap-1 bg-[#181d2a] hover:bg-[#22293b] border border-[#2b354d] hover:border-cyan-500/50 text-slate-200 hover:text-white font-semibold text-xs px-2.5 py-1.5 rounded-xl shadow-sm transition">
+                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span>Add</span>
+                </button>
+
+                <!-- Settings Gear -->
+                <button id="open-settings-modal-btn" title="Audio Device Configuration" class="p-1.5 rounded-xl bg-[#141824] border border-[#28334a] hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 transition">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
-        <div class="instructions">
-            <h2>Instructions</h2>
-            <p>Click on buttons or use keyboard shortcuts to play sounds.</p>
-            <p>Default shortcuts are number keys (1-9)</p>
+    </header>
+
+    <!-- Main Layout: 3 Numpad Groups Stacked Vertically -->
+    <main class="flex-1 max-w-[1500px] w-full mx-auto px-4 lg:px-8 py-5 space-y-6">
+
+        <!-- 1. Ctrl Group (Stacked Full-Width Section) -->
+        <section class="numpad-group-container space-y-3">
+            <div class="flex items-center justify-between border-b border-[#222a3d] pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-md bg-[#f4ede2]/10 border border-[#f4ede2]/20 text-[#f4ede2] font-bold text-xs font-mono tracking-wider">CTRL</span>
+                    <h2 class="text-sm font-bold text-slate-200">Ctrl + Number Keys</h2>
+                </div>
+                <span class="text-xs text-slate-400">11 Numpad Keys</span>
+            </div>
+            <div id="grid-ctrl" class="grid grid-cols-3 gap-3">
+                <!-- Populated dynamically: Row 1: 7, 8, 9 | Row 2: 4, 5, 6 | Row 3: 1, 2, 3 | Row 4: 0 (span 2), . -->
+            </div>
+        </section>
+
+        <!-- 2. Alt Group (Stacked Full-Width Section) -->
+        <section class="numpad-group-container space-y-3">
+            <div class="flex items-center justify-between border-b border-[#222a3d] pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-md bg-[#f4ede2]/10 border border-[#f4ede2]/20 text-[#f4ede2] font-bold text-xs font-mono tracking-wider">ALT</span>
+                    <h2 class="text-sm font-bold text-slate-200">Alt + Number Keys</h2>
+                </div>
+                <span class="text-xs text-slate-400">11 Numpad Keys</span>
+            </div>
+            <div id="grid-alt" class="grid grid-cols-3 gap-3">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- 3. Ctrl + Alt Group (Stacked Full-Width Section) -->
+        <section class="numpad-group-container space-y-3">
+            <div class="flex items-center justify-between border-b border-[#222a3d] pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-md bg-[#f4ede2]/10 border border-[#f4ede2]/20 text-[#f4ede2] font-bold text-xs font-mono tracking-wider">CTRL+ALT</span>
+                    <h2 class="text-sm font-bold text-slate-200">Ctrl + Alt + Keys</h2>
+                </div>
+                <span class="text-xs text-slate-400">10 Numpad Keys</span>
+            </div>
+            <div id="grid-ctrl-alt" class="grid grid-cols-3 gap-3">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Audio Device Routing & Settings -->
+    <div id="settings-modal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+        <div class="bg-[#121622] border border-[#2b354d] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6">
+            
+            <div class="flex items-center justify-between border-b border-[#222a3d] pb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-base font-bold text-white">Audio Device Configuration</h2>
+                </div>
+                <button class="close-modal-btn text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                
+                <!-- Primary Audio Device -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">1. Headset / Headphones Output</label>
+                    <select id="primary-device-select" class="w-full bg-[#181d2a] border border-[#2e3952] focus:border-cyan-500 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none">
+                        <option value="">Sony Headset / Wireless Stereo Headset</option>
+                    </select>
+                </div>
+
+                <!-- Secondary Audio Device (Virtual Cable) -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">2. Virtual Cable Output (for OBS / Discord)</label>
+                    <select id="secondary-device-select" class="w-full bg-[#181d2a] border border-[#2e3952] focus:border-cyan-500 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none">
+                        <option value="">CABLE Input (VB-Audio Virtual Cable)</option>
+                    </select>
+                </div>
+
+                <!-- Panic Stop Key -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Global Panic Stop Key</label>
+                    <div class="flex items-center gap-2">
+                        <input id="panic-key-input" type="text" value="esc" class="flex-1 bg-[#181d2a] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none">
+                        <button id="save-panic-key-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-semibold transition">Save</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="flex items-center justify-end gap-3 border-t border-[#222a3d] pt-4">
+                <button id="test-audio-routing-btn" class="px-4 py-2 bg-cyan-600/20 border border-cyan-500/40 hover:bg-cyan-600/30 text-cyan-300 rounded-xl text-sm font-bold transition">Test Sound Chime</button>
+                <button id="save-audio-settings-btn" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-cyan-600/30">Save Settings</button>
+            </div>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='js/soundboard.js') }}"></script>
+
+    <!-- Modal: Upload Sound File -->
+    <div id="upload-modal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+        <div class="bg-[#121622] border border-[#2b354d] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div class="flex items-center justify-between border-b border-[#222a3d] pb-4">
+                <h2 class="text-base font-bold text-white">Upload New Sound Clip</h2>
+                <button class="close-modal-btn text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="upload-sound-form" class="space-y-4">
+                <div id="file-dropzone" class="border-2 border-dashed border-[#2f3b54] hover:border-cyan-500 rounded-xl p-6 text-center cursor-pointer transition bg-[#10141f]">
+                    <svg class="w-10 h-10 text-cyan-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-sm font-semibold text-slate-200">Drag & Drop audio file here</p>
+                    <p class="text-xs text-slate-500 mt-1">or click to browse (MP3, WAV, OGG, FLAC)</p>
+                    <input id="sound-file-input" type="file" accept=".mp3,.wav,.ogg,.flac" class="hidden" required>
+                    <div id="selected-file-name" class="mt-3 text-xs font-mono text-cyan-400 hidden"></div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Sound Display Name</label>
+                    <input id="upload-name-input" type="text" placeholder="e.g. Victory Fanfare" class="w-full bg-[#181d2a] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Assign Hotkey (Optional)</label>
+                    <input id="upload-hotkey-input" type="text" placeholder="e.g. ctrl+1, alt+9" class="w-full bg-[#181d2a] border border-[#2e3952] rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-2">
+                    <button type="button" class="close-modal-btn px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-semibold">Cancel</button>
+                    <button type="submit" id="upload-submit-btn" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-cyan-600/30 transition">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hotkey Rebind Overlay Dialog -->
+    <div id="rebind-modal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+        <div class="bg-[#121622] border border-cyan-500/50 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+            <div class="w-12 h-12 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center mx-auto animate-pulse">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+            </div>
+            <h3 id="rebind-title" class="text-base font-bold text-white">Press any key combination...</h3>
+            <p id="rebind-sound-name" class="text-xs text-slate-400"></p>
+            <div id="captured-key-display" class="py-3 px-4 bg-[#0b0d13] border border-[#2e3952] rounded-xl text-cyan-400 font-mono font-bold text-lg min-h-[48px] flex items-center justify-center">
+                Listening for keys...
+            </div>
+            <div class="flex items-center justify-center gap-2 pt-2">
+                <button id="clear-hotkey-btn" class="px-3 py-1.5 bg-red-900/40 hover:bg-red-800/60 border border-red-500/30 text-red-300 rounded-xl text-xs font-semibold">Clear Hotkey</button>
+                <button id="cancel-rebind-btn" class="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/soundboard.js') }}?v={{ timestamp }}"></script>
 </body>
 </html>
