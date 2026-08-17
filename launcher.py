@@ -96,9 +96,7 @@ class SoundboardLauncher(tk.Tk):
         # Set Window Icon
         icon_candidates = [
             os.path.join(_EXE_DIR, 'app_icon.ico'),
-            os.path.join(_BUNDLE, 'app_icon.ico'),
-            os.path.join(_EXE_DIR, 'neon_v_soundboard_icon.ico'),
-            os.path.join(_BUNDLE, 'neon_v_soundboard_icon.ico')
+            os.path.join(_BUNDLE, 'app_icon.ico')
         ]
         for icon_path in icon_candidates:
             if os.path.exists(icon_path):

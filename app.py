@@ -11,7 +11,7 @@ Flask server providing REST APIs and modern UI for:
 import sys
 import os
 import time
-from flask import Flask, render_template, send_from_directory, jsonify, request, make_response
+from flask import Flask, render_template, send_from_directory, jsonify, request
 from werkzeug.utils import secure_filename
 
 from audio_engine import AudioEngine
