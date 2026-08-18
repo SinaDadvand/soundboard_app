@@ -3,7 +3,7 @@ FROM python:3.11-slim
 
 # Metadata
 LABEL maintainer="Virtual Soundboard" \
-      version="2.2-cloud" \
+      version="2.3-cloud" \
       description="Virtual Soundboard Pro with Real-Time DSP and Discord Voice Streaming"
 
 # Set environment variables for Python and Cloud Run
