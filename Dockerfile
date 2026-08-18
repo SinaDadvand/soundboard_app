@@ -14,12 +14,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Install system dependencies:
 # - ffmpeg: audio decoding & Discord Opus voice streaming
-# - libopus0: Discord Opus audio codec
+# - libopus0 & libopus-dev: Discord Opus audio codec
 # - libsndfile1: soundfile audio loader
 # - libportaudio2 & portaudio19-dev: PortAudio library for audio I/O
+# - build-essential & libffi-dev: C-compiler and FFI for PyNaCl voice encryption
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libffi-dev \
     ffmpeg \
     libopus0 \
+    libopus-dev \
     libsndfile1 \
     libportaudio2 \
     portaudio19-dev \

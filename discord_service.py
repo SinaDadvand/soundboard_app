@@ -23,6 +23,14 @@ try:
     from discord.ext import commands
     DISCORD_AVAILABLE = True
     BasePCMAudio = discord.PCMAudio
+    # Ensure Opus is loaded on Linux
+    if not discord.opus.is_loaded():
+        for opus_lib in ['libopus.so.0', 'libopus.so', '/usr/lib/x86_64-linux-gnu/libopus.so.0', '/usr/lib/aarch64-linux-gnu/libopus.so.0']:
+            try:
+                discord.opus.load_opus(opus_lib)
+                break
+            except Exception:
+                pass
 except (ImportError, Exception):
     discord = None
     commands = None
