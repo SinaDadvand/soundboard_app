@@ -6,7 +6,14 @@ Supports live rebinding, custom key combinations, and panic stop key.
 """
 
 import threading
-import keyboard
+
+try:
+    import keyboard
+    KEYBOARD_AVAILABLE = True
+except (ImportError, OSError, Exception) as e:
+    keyboard = None
+    KEYBOARD_AVAILABLE = False
+    print(f"[HotkeyManager] Global OS keyboard hooks unavailable ({e}). In-browser hotkeys remain fully active.")
 
 
 class HotkeyManager:
@@ -18,15 +25,22 @@ class HotkeyManager:
         self.listener_started = False
 
     def start_listener(self):
-        """Start background keyboard listener loop."""
+        """Start background keyboard listener loop if OS hooks are supported."""
+        if not KEYBOARD_AVAILABLE or keyboard is None:
+            return
         if not self.listener_started:
-            t = threading.Thread(target=keyboard.wait, daemon=True)
-            t.start()
-            self.listener_started = True
-            print("[HotkeyManager] Global keyboard listener started.")
+            try:
+                t = threading.Thread(target=keyboard.wait, daemon=True)
+                t.start()
+                self.listener_started = True
+                print("[HotkeyManager] Global keyboard listener started.")
+            except Exception as e:
+                print(f"[HotkeyManager] Notice: keyboard listener not started ({e})")
 
     def reload_all_hotkeys(self):
         """Unregister all existing hotkeys and register from latest config."""
+        if not KEYBOARD_AVAILABLE or keyboard is None:
+            return
         with self.lock:
             # Clear all existing hotkey handlers
             try:
@@ -110,10 +124,11 @@ class HotkeyManager:
             self.config_manager.update_sound(existing['id'], {'hotkey': None})
 
         # Test if valid hotkey syntax
-        try:
-            keyboard.parse_hotkey(clean_hk)
-        except Exception as ex:
-            return False, f"Invalid hotkey syntax: {ex}"
+        if KEYBOARD_AVAILABLE and keyboard is not None:
+            try:
+                keyboard.parse_hotkey(clean_hk)
+            except Exception as ex:
+                return False, f"Invalid hotkey syntax: {ex}"
 
         # Update in config
         self.config_manager.update_sound(sound_id, {'hotkey': clean_hk})
