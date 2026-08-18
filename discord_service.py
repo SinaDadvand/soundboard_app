@@ -4,7 +4,8 @@ Discord Voice Bot Service for Virtual Soundboard
 Streams processed soundboard audio (with real-time Pitch, Speed, Echo, Reverb DSP)
 directly into Discord Voice Channels.
 
-Runs asynchronously in a background daemon thread alongside Flask.
+Supports full polyphony: multiple sounds and multiple copies of the same sound
+play simultaneously over each other without cutting off.
 """
 
 import os
@@ -38,20 +39,51 @@ except (ImportError, Exception):
     BasePCMAudio = object
 
 
-class DiscordAudioSource(discord.AudioSource if DISCORD_AVAILABLE else object):
-    """Custom PCM Audio Source from in-memory raw 16-bit 48kHz stereo bytes with proper frame padding."""
-    def __init__(self, raw_bytes):
-        self.stream = io.BytesIO(raw_bytes)
+class DiscordMixerAudioSource(discord.AudioSource if DISCORD_AVAILABLE else object):
+    """Real-time Multi-Track Audio Mixer for Discord Voice.
+    Allows multiple sounds and multiple copies of the same sound to play simultaneously over each other.
+    """
+    def __init__(self):
+        self.tracks = []
+        self.lock = threading.Lock()
+
+    def add_track(self, raw_bytes: bytes):
+        with self.lock:
+            self.tracks.append(io.BytesIO(raw_bytes))
+
+    def stop_all(self):
+        with self.lock:
+            self.tracks.clear()
+
+    def is_playing_any(self):
+        with self.lock:
+            return len(self.tracks) > 0
 
     def read(self):
-        # 3840 bytes = exactly 20ms of 48,000Hz * 2 channels * 2 bytes/sample (16-bit PCM)
-        chunk = self.stream.read(3840)
-        if len(chunk) < 3840:
-            if len(chunk) == 0:
-                return b''
-            # Pad the trailing frame with silence so the sound doesn't get clipped
-            return chunk + (b'\x00' * (3840 - len(chunk)))
-        return chunk
+        # 3840 bytes = 20ms frame of 48,000Hz * 2 channels * 2 bytes/sample (16-bit PCM)
+        frame_bytes = 3840
+        num_samples = 1920
+
+        with self.lock:
+            if not self.tracks:
+                return b'\x00' * frame_bytes
+
+            mixed = np.zeros(num_samples, dtype=np.int32)
+            active_tracks = []
+
+            for stream in self.tracks:
+                chunk = stream.read(frame_bytes)
+                if len(chunk) > 0:
+                    if len(chunk) < frame_bytes:
+                        chunk = chunk + (b'\x00' * (frame_bytes - len(chunk)))
+                    samples = np.frombuffer(chunk, dtype=np.int16)
+                    mixed += samples
+                    if stream.tell() < stream.getbuffer().nbytes:
+                        active_tracks.append(stream)
+
+            self.tracks = active_tracks
+            mixed_clipped = np.clip(mixed, -32768, 32767).astype(np.int16)
+            return mixed_clipped.tobytes()
 
     def is_opus(self):
         return False
@@ -65,6 +97,7 @@ class DiscordService:
         self.loop = None
         self.thread = None
         self.voice_client = None
+        self.mixer = DiscordMixerAudioSource()
         self.is_running = False
         self.is_connecting = False
         self.last_error = None
@@ -133,18 +166,15 @@ class DiscordService:
         async def cmd_join(ctx):
             if ctx.author.voice and ctx.author.voice.channel:
                 channel = ctx.author.voice.channel
-                await channel.connect()
+                await self._join_channel_internal(channel.id)
                 await ctx.send(f"🔊 Joined **{channel.name}**!")
             else:
                 await ctx.send("❌ You are not connected to a voice channel.")
 
         @self.bot.command(name="leave")
         async def cmd_leave(ctx):
-            if ctx.voice_client:
-                await ctx.voice_client.disconnect()
-                await ctx.send("👋 Disconnected from voice channel.")
-            else:
-                await ctx.send("Not connected to any voice channel.")
+            await self._leave_internal()
+            await ctx.send("👋 Disconnected from voice channel.")
 
         @self.bot.command(name="sounds")
         async def cmd_sounds(ctx):
@@ -187,16 +217,30 @@ class DiscordService:
             if voice_client:
                 if voice_client.channel.id == channel.id:
                     self.voice_client = voice_client
-                    return True, f"Already connected to {channel.name}"
-                await voice_client.move_to(channel)
-                self.voice_client = voice_client
-                return True, f"Moved to {channel.name}"
+                else:
+                    await voice_client.move_to(channel)
+                    self.voice_client = voice_client
             else:
                 self.voice_client = await channel.connect(timeout=15.0, reconnect=True)
-                return True, f"Connected to {channel.name}"
+
+            # Ensure continuous polyphonic mixer is attached to the voice client
+            if self.voice_client and not self.voice_client.is_playing():
+                self.voice_client.play(self.mixer)
+
+            return True, f"Connected to {channel.name}"
         except Exception as e:
             print(f"[DiscordService] Voice connection error: {e}")
             return False, f"Voice connect failed: {e}"
+
+    async def _leave_internal(self):
+        self.mixer.stop_all()
+        for vc in list(self.bot.voice_clients):
+            try:
+                await vc.disconnect(force=True)
+            except Exception:
+                pass
+        self.voice_client = None
+        return True, "Disconnected from voice"
 
     def join_channel(self, channel_id):
         """Threadsafe call to join a voice channel."""
@@ -217,20 +261,18 @@ class DiscordService:
         if not self.is_running or not self.loop:
             return False, "Discord Bot is not running"
 
-        async def _leave():
-            for vc in list(self.bot.voice_clients):
-                await vc.disconnect(force=True)
-            self.voice_client = None
-            return True, "Disconnected from voice"
-
-        future = asyncio.run_coroutine_threadsafe(_leave(), self.loop)
+        future = asyncio.run_coroutine_threadsafe(self._leave_internal(), self.loop)
         try:
             return future.result(timeout=5)
         except Exception as e:
             return False, str(e)
 
+    def stop_all_sounds(self):
+        """Stop all active audio streams in mixer immediately."""
+        self.mixer.stop_all()
+
     def play_audio_array(self, audio_data: np.ndarray, sr: int = 48000):
-        """Stream a float32 audio array to active Discord voice client."""
+        """Stream a float32 audio array to active Discord voice mixer (polyphonic)."""
         if not self.is_running or not self.loop:
             return False
 
@@ -244,8 +286,9 @@ class DiscordService:
             if not active_vc or not active_vc.is_connected():
                 return False
 
-            if active_vc.is_playing():
-                active_vc.stop()
+            # Ensure mixer is attached
+            if not active_vc.is_playing():
+                active_vc.play(self.mixer)
 
             # Resample to 48,000 Hz if needed (Discord standard sample rate)
             from scipy import signal
@@ -266,8 +309,8 @@ class DiscordService:
             pcm16 = np.ascontiguousarray(pcm16)
             raw_bytes = pcm16.tobytes()
 
-            source = DiscordAudioSource(raw_bytes)
-            active_vc.play(source)
+            # Add to mixer (allows overlapping sounds and repeated plays of the same sound)
+            self.mixer.add_track(raw_bytes)
             return True
 
         future = asyncio.run_coroutine_threadsafe(_play(), self.loop)
@@ -343,20 +386,11 @@ class DiscordService:
 
     def stop(self):
         """Disconnect and stop the bot."""
+        self.mixer.stop_all()
         if self.loop and self.bot:
-            async def _close():
-                for vc in list(self.bot.voice_clients):
-                    try:
-                        await vc.disconnect(force=True)
-                    except Exception:
-                        pass
-                try:
-                    await self.bot.close()
-                except Exception:
-                    pass
-
             try:
-                asyncio.run_coroutine_threadsafe(_close(), self.loop)
+                asyncio.run_coroutine_threadsafe(self._leave_internal(), self.loop)
+                asyncio.run_coroutine_threadsafe(self.bot.close(), self.loop)
             except Exception:
                 pass
         self.is_running = False

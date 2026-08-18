@@ -316,14 +316,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const speedVal = card.querySelector('.speed-val');
         const resetSpeedBtn = card.querySelector('.reset-speed-btn');
 
-        // Play / Stop
+        // Play (Multi-instance polyphonic)
         playBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (activePlayingIds.has(sound.id)) {
-                stopSound(sound.id);
-            } else {
-                playFromBrowser(sound);
-            }
+            playFromBrowser(sound);
+        });
+
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('input') || e.target.closest('button')) return;
+            playFromBrowser(sound);
         });
 
         // Rebind Hotkey

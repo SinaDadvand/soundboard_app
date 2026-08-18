@@ -474,4 +474,9 @@ class AudioEngine:
             for entry in self.active_streams:
                 entry['stop_event'].set()
             self.active_streams.clear()
+        if self.discord_service:
+            try:
+                self.discord_service.stop_all_sounds()
+            except Exception:
+                pass
         print("[AudioEngine] Stopped all playback.")
