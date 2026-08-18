@@ -47,6 +47,8 @@ class DiscordService:
         self.thread = None
         self.voice_client = None
         self.is_running = False
+        self.is_connecting = False
+        self.last_error = None
         self.lock = threading.Lock()
 
         # Load credentials from environment or config
@@ -62,37 +64,44 @@ class DiscordService:
     def start(self):
         """Start Discord Bot event loop in a background daemon thread."""
         if not DISCORD_AVAILABLE:
+            self.last_error = "discord.py not installed"
             print("[DiscordService] discord.py or PyNaCl not installed. Discord streaming disabled.")
             return False
 
-        if not self.token:
-            print("[DiscordService] No DISCORD_BOT_TOKEN provided. Discord bot is idle (configure via settings or .env).")
+        if not self.token or not self.token.strip():
+            self.last_error = "No Bot Token provided"
             return False
 
-        if self.is_running:
-            return True
+        with self.lock:
+            if self.is_running or self.is_connecting:
+                return True
 
-        self.thread = threading.Thread(target=self._run_bot_thread, daemon=True, name="DiscordBotThread")
-        self.thread.start()
-        return True
+            self.is_connecting = True
+            self.last_error = None
+            self.thread = threading.Thread(target=self._run_bot_thread, daemon=True, name="DiscordBotThread")
+            self.thread.start()
+            return True
 
     def _run_bot_thread(self):
         """Background thread target setting up dedicated asyncio loop."""
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
+        # Start with standard intents
         intents = discord.Intents.default()
-        intents.message_content = True
-        intents.voice_states = True
-        intents.guilds = True
+        try:
+            intents.message_content = True
+        except Exception:
+            pass
 
         self.bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
         @self.bot.event
         async def on_ready():
             self.is_running = True
+            self.is_connecting = False
+            self.last_error = None
             print(f"[DiscordService] Logged in as {self.bot.user} (ID: {self.bot.user.id})")
-            # Auto-join default voice channel if configured
             if self.default_channel_id:
                 try:
                     await self._join_channel_internal(int(self.default_channel_id))
@@ -101,7 +110,6 @@ class DiscordService:
 
         @self.bot.command(name="join")
         async def cmd_join(ctx):
-            """Join author's voice channel."""
             if ctx.author.voice and ctx.author.voice.channel:
                 channel = ctx.author.voice.channel
                 await channel.connect()
@@ -111,7 +119,6 @@ class DiscordService:
 
         @self.bot.command(name="leave")
         async def cmd_leave(ctx):
-            """Disconnect from voice channel."""
             if ctx.voice_client:
                 await ctx.voice_client.disconnect()
                 await ctx.send("👋 Disconnected from voice channel.")
@@ -120,7 +127,6 @@ class DiscordService:
 
         @self.bot.command(name="sounds")
         async def cmd_sounds(ctx):
-            """List available sound clips."""
             if not self.config_manager:
                 return
             sounds = self.config_manager.config.get('sounds', [])
@@ -128,19 +134,32 @@ class DiscordService:
             list_str = ", ".join(f"`{n}`" for n in names)
             await ctx.send(f"🎵 **Soundboard Clips ({len(sounds)} total):**\n{list_str}")
 
+        clean_token = self.token.strip()
         try:
-            self.loop.run_until_complete(self.bot.start(self.token))
-        except Exception as e:
-            print(f"[DiscordService] Bot error or shutdown: {e}")
+            self.loop.run_until_complete(self.bot.start(clean_token))
+        except (discord.errors.PrivilegedIntentsRequired, Exception) as e:
+            err_str = str(e)
+            if "Privileged" in err_str or "intent" in err_str.lower():
+                print("[DiscordService] Privileged intents disabled. Retrying with basic intents...")
+                try:
+                    basic_intents = discord.Intents.default()
+                    self.bot = commands.Bot(command_prefix="!", intents=basic_intents, help_command=None)
+                    self.loop.run_until_complete(self.bot.start(clean_token))
+                except Exception as e2:
+                    self.last_error = f"Error: {e2}"
+                    print(f"[DiscordService] Fallback bot error: {e2}")
+            else:
+                self.last_error = f"Login Failed: {err_str}"
+                print(f"[DiscordService] Bot error or shutdown: {e}")
         finally:
             self.is_running = False
+            self.is_connecting = False
 
     async def _join_channel_internal(self, channel_id):
         channel = self.bot.get_channel(int(channel_id))
         if not channel or not isinstance(channel, discord.VoiceChannel):
             return False, "Channel not found or not a voice channel"
 
-        # Check existing voice client in this guild
         voice_client = channel.guild.voice_client
         if voice_client:
             if voice_client.channel.id == channel.id:
@@ -156,7 +175,7 @@ class DiscordService:
     def join_channel(self, channel_id):
         """Threadsafe call to join a voice channel."""
         if not self.is_running or not self.loop:
-            return False, "Discord Bot is not running. Check Bot Token in settings."
+            return False, "Discord Bot is not connected. Please verify Bot Token."
 
         future = asyncio.run_coroutine_threadsafe(
             self._join_channel_internal(channel_id),
@@ -185,10 +204,7 @@ class DiscordService:
             return False, str(e)
 
     def play_audio_array(self, audio_data: np.ndarray, sr: int = 48000):
-        """
-        Stream a float32 audio array (with DSP Pitch/Speed/Echo/Reverb) to active Discord voice client.
-        Converts array to 48kHz 16-bit stereo PCM for Discord Opus encoder.
-        """
+        """Stream a float32 audio array to active Discord voice client."""
         if not self.is_running or not self.loop:
             return False
 
@@ -213,13 +229,11 @@ class DiscordService:
                 new_len = int(len(data) * target_sr / sr)
                 data = signal.resample(data, new_len).astype(np.float32)
 
-            # Ensure 2 channels
             if data.ndim == 1:
                 data = np.column_stack((data, data))
             elif data.shape[1] > 2:
                 data = data[:, :2]
 
-            # Convert float32 [-1.0, 1.0] to 16-bit PCM bytes
             pcm16 = (np.clip(data, -1.0, 1.0) * 32767.0).astype(np.int16)
             raw_bytes = pcm16.tobytes()
 
@@ -236,7 +250,7 @@ class DiscordService:
 
     def get_status(self):
         """Return real-time Discord connection status."""
-        configured = bool(self.token)
+        configured = bool(self.token and self.token.strip())
         connected = bool(self.is_running and self.bot and self.bot.is_ready())
         voice_connected = False
         channel_name = None
@@ -265,6 +279,8 @@ class DiscordService:
         return {
             'configured': configured,
             'connected': connected,
+            'is_connecting': self.is_connecting,
+            'error': self.last_error,
             'user': str(self.bot.user) if (connected and self.bot and self.bot.user) else None,
             'voice_connected': voice_connected,
             'channel_name': channel_name,
@@ -274,11 +290,10 @@ class DiscordService:
         }
 
     def update_config(self, token=None, guild_id=None, channel_id=None):
-        """Update Discord credentials and restart bot if token changed."""
-        token_changed = False
-        if token is not None and token.strip() != self.token:
-            self.token = token.strip() if token.strip() else None
-            token_changed = True
+        """Update Discord credentials and start/restart bot."""
+        if token is not None:
+            clean = token.strip()
+            self.token = clean if clean else None
         if guild_id is not None:
             self.default_guild_id = str(guild_id).strip()
         if channel_id is not None:
@@ -290,10 +305,10 @@ class DiscordService:
             self.config_manager.config['discord_channel_id'] = self.default_channel_id
             self.config_manager.save_config()
 
-        if token_changed:
-            self.stop()
-            if self.token:
-                self.start()
+        # Stop previous instance if running
+        self.stop()
+        if self.token:
+            self.start()
 
         return self.get_status()
 
@@ -305,6 +320,10 @@ class DiscordService:
                     await vc.disconnect(force=True)
                 await self.bot.close()
 
-            asyncio.run_coroutine_threadsafe(_close(), self.loop)
+            try:
+                asyncio.run_coroutine_threadsafe(_close(), self.loop)
+            except Exception:
+                pass
             self.is_running = False
+            self.is_connecting = False
             self.voice_client = None

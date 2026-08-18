@@ -1011,7 +1011,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (st.connected) {
                         discordModalStatusBadge.textContent = `Bot Ready (${st.user})`;
                         discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 font-medium border border-purple-800/50';
-                    } else if (st.configured) {
+                    } else if (st.error) {
+                        discordModalStatusBadge.textContent = `Error: ${st.error}`;
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-red-950 text-red-300 font-medium border border-red-800/50';
+                    } else if (st.is_connecting || st.configured) {
                         discordModalStatusBadge.textContent = 'Connecting...';
                         discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 font-medium';
                     } else {
