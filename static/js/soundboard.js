@@ -826,7 +826,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         secondary_enabled: true
                     })
                 });
-                alert('Audio device settings saved!');
+
+                // If a Discord channel is selected, join it
+                if (discordChannelSelect && discordChannelSelect.value) {
+                    await fetch('/api/discord/join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ channel_id: discordChannelSelect.value })
+                    });
+                    await pollDiscordStatus();
+                }
+
+                alert('Settings saved and connected!');
                 settingsModal.classList.add('hidden');
             } catch (err) {
                 console.error('Save audio settings error:', err);
