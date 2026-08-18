@@ -1,6 +1,11 @@
 # Use official lightweight Python image
 FROM python:3.11-slim
 
+# Metadata
+LABEL maintainer="Virtual Soundboard" \
+      version="2.2-cloud" \
+      description="Virtual Soundboard Pro with Real-Time DSP and Discord Voice Streaming"
+
 # Set environment variables for Python and Cloud Run
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -29,5 +34,5 @@ COPY . .
 # Expose default Cloud Run port
 EXPOSE 8080
 
-# Run with Gunicorn (1 worker + 8 threads to allow concurrent Flask requests and async background Discord bot)
+# Run with Gunicorn (1 worker + 8 threads for concurrent Flask requests and async background Discord bot)
 CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 0 app:app
