@@ -171,17 +171,21 @@ class DiscordService:
         if not channel or not isinstance(channel, discord.VoiceChannel):
             return False, "Channel not found or not a voice channel"
 
-        voice_client = channel.guild.voice_client
-        if voice_client:
-            if voice_client.channel.id == channel.id:
+        try:
+            voice_client = channel.guild.voice_client
+            if voice_client:
+                if voice_client.channel.id == channel.id:
+                    self.voice_client = voice_client
+                    return True, f"Already connected to {channel.name}"
+                await voice_client.move_to(channel)
                 self.voice_client = voice_client
-                return True, f"Already connected to {channel.name}"
-            await voice_client.move_to(channel)
-            self.voice_client = voice_client
-            return True, f"Moved to {channel.name}"
-        else:
-            self.voice_client = await channel.connect()
-            return True, f"Connected to {channel.name}"
+                return True, f"Moved to {channel.name}"
+            else:
+                self.voice_client = await channel.connect(timeout=15.0, reconnect=True)
+                return True, f"Connected to {channel.name}"
+        except Exception as e:
+            print(f"[DiscordService] Voice connection error: {e}")
+            return False, f"Voice connect failed: {e}"
 
     def join_channel(self, channel_id):
         """Threadsafe call to join a voice channel."""
@@ -193,7 +197,7 @@ class DiscordService:
             self.loop
         )
         try:
-            return future.result(timeout=10)
+            return future.result(timeout=15)
         except Exception as e:
             return False, str(e)
 
