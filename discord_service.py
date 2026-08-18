@@ -38,12 +38,23 @@ except (ImportError, Exception):
     BasePCMAudio = object
 
 
-class DiscordAudioSource(BasePCMAudio):
-    """Custom PCM Audio Source from in-memory raw 16-bit 48kHz stereo bytes."""
+class DiscordAudioSource(discord.AudioSource if DISCORD_AVAILABLE else object):
+    """Custom PCM Audio Source from in-memory raw 16-bit 48kHz stereo bytes with proper frame padding."""
     def __init__(self, raw_bytes):
         self.stream = io.BytesIO(raw_bytes)
-        if DISCORD_AVAILABLE and hasattr(super(), '__init__'):
-            super().__init__(self.stream)
+
+    def read(self):
+        # 3840 bytes = exactly 20ms of 48,000Hz * 2 channels * 2 bytes/sample (16-bit PCM)
+        chunk = self.stream.read(3840)
+        if len(chunk) < 3840:
+            if len(chunk) == 0:
+                return b''
+            # Pad the trailing frame with silence so the sound doesn't get clipped
+            return chunk + (b'\x00' * (3840 - len(chunk)))
+        return chunk
+
+    def is_opus(self):
+        return False
 
 
 class DiscordService:
@@ -249,7 +260,10 @@ class DiscordService:
             elif data.shape[1] > 2:
                 data = data[:, :2]
 
+            # Ensure contiguous 2-channel float32
+            data = np.ascontiguousarray(data, dtype=np.float32)
             pcm16 = (np.clip(data, -1.0, 1.0) * 32767.0).astype(np.int16)
+            pcm16 = np.ascontiguousarray(pcm16)
             raw_bytes = pcm16.tobytes()
 
             source = DiscordAudioSource(raw_bytes)
