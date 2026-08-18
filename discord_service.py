@@ -61,7 +61,7 @@ class DiscordService:
             self.default_guild_id = self.config_manager.config.get('discord_guild_id')
             self.default_channel_id = self.config_manager.config.get('discord_channel_id')
 
-    def start(self):
+    def start(self, force=False):
         """Start Discord Bot event loop in a background daemon thread."""
         if not DISCORD_AVAILABLE:
             self.last_error = "discord.py not installed"
@@ -73,13 +73,15 @@ class DiscordService:
             return False
 
         with self.lock:
-            if self.is_running or self.is_connecting:
+            if not force and (self.is_running or (self.thread and self.thread.is_alive())):
                 return True
 
+            self.is_running = False
             self.is_connecting = True
             self.last_error = None
             self.thread = threading.Thread(target=self._run_bot_thread, daemon=True, name="DiscordBotThread")
             self.thread.start()
+            print(f"[DiscordService] Background bot thread launched.")
             return True
 
     def _run_bot_thread(self):
@@ -87,7 +89,7 @@ class DiscordService:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
-        # Start with standard intents
+        # Standard non-privileged intents
         intents = discord.Intents.default()
         try:
             intents.message_content = True
@@ -135,12 +137,13 @@ class DiscordService:
             await ctx.send(f"🎵 **Soundboard Clips ({len(sounds)} total):**\n{list_str}")
 
         clean_token = self.token.strip()
+        print(f"[DiscordService] Connecting to Discord Gateway...")
         try:
             self.loop.run_until_complete(self.bot.start(clean_token))
         except (discord.errors.PrivilegedIntentsRequired, Exception) as e:
             err_str = str(e)
             if "Privileged" in err_str or "intent" in err_str.lower():
-                print("[DiscordService] Privileged intents disabled. Retrying with basic intents...")
+                print("[DiscordService] Privileged intents disabled in portal. Retrying with basic intents...")
                 try:
                     basic_intents = discord.Intents.default()
                     self.bot = commands.Bot(command_prefix="!", intents=basic_intents, help_command=None)
@@ -305,25 +308,31 @@ class DiscordService:
             self.config_manager.config['discord_channel_id'] = self.default_channel_id
             self.config_manager.save_config()
 
-        # Stop previous instance if running
+        # Stop previous instance if running and force clean start
         self.stop()
         if self.token:
-            self.start()
+            self.start(force=True)
 
         return self.get_status()
 
     def stop(self):
         """Disconnect and stop the bot."""
-        if self.is_running and self.loop and self.bot:
+        if self.loop and self.bot:
             async def _close():
                 for vc in list(self.bot.voice_clients):
-                    await vc.disconnect(force=True)
-                await self.bot.close()
+                    try:
+                        await vc.disconnect(force=True)
+                    except Exception:
+                        pass
+                try:
+                    await self.bot.close()
+                except Exception:
+                    pass
 
             try:
                 asyncio.run_coroutine_threadsafe(_close(), self.loop)
             except Exception:
                 pass
-            self.is_running = False
-            self.is_connecting = False
-            self.voice_client = None
+        self.is_running = False
+        self.is_connecting = False
+        self.voice_client = None
