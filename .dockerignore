@@ -1,0 +1,15 @@
+.git
+.github
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+build
+dist
+.pytest_cache
+*.spec
+*.bat
+*.ps1

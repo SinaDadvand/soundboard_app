@@ -17,6 +17,7 @@ from werkzeug.utils import secure_filename
 from audio_engine import AudioEngine
 from config_manager import ConfigManager
 from hotkey_manager import HotkeyManager
+from discord_service import DiscordService
 
 app = Flask(__name__)
 
@@ -56,6 +57,8 @@ print(f"[Soundboard] Using Config File: {CONFIG_PATH}")
 audio_engine = AudioEngine(AUDIO_FOLDER)
 config_manager = ConfigManager(config_path=CONFIG_PATH, audio_dir=AUDIO_FOLDER)
 hotkey_manager = HotkeyManager(audio_engine, config_manager)
+discord_service = DiscordService(config_manager, audio_engine)
+audio_engine.discord_service = discord_service
 
 # Apply stored settings to engine
 audio_engine.master_volume = config_manager.config.get('master_volume', 1.0)
@@ -361,8 +364,47 @@ def api_set_panic_key():
     return jsonify({'status': 'success', 'panic_key': config_manager.config.get('panic_key')})
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Discord Bot REST Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route('/api/discord/status', methods=['GET'])
+def api_discord_status():
+    return jsonify(discord_service.get_status())
+
+
+@app.route('/api/discord/join', methods=['POST'])
+def api_discord_join():
+    data = request.get_json() or {}
+    channel_id = data.get('channel_id') or discord_service.default_channel_id
+    if not channel_id:
+        return jsonify({'status': 'error', 'message': 'No voice channel ID specified'}), 400
+
+    success, msg = discord_service.join_channel(channel_id)
+    if success:
+        return jsonify({'status': 'success', 'message': msg, 'details': discord_service.get_status()})
+    return jsonify({'status': 'error', 'message': msg}), 400
+
+
+@app.route('/api/discord/leave', methods=['POST'])
+def api_discord_leave():
+    success, msg = discord_service.leave_channel()
+    if success:
+        return jsonify({'status': 'success', 'message': msg})
+    return jsonify({'status': 'error', 'message': msg}), 400
+
+
+@app.route('/api/discord/config', methods=['POST'])
+def api_discord_config():
+    data = request.get_json() or {}
+    token = data.get('token')
+    guild_id = data.get('guild_id')
+    channel_id = data.get('channel_id')
+    status = discord_service.update_config(token=token, guild_id=guild_id, channel_id=channel_id)
+    return jsonify({'status': 'success', 'discord': status})
+
+
 def initialize_app():
-    """Load config, preload audio files, register hotkeys and start keyboard listener."""
+    """Load config, preload audio files, register hotkeys, start keyboard listener & Discord bot."""
     print("\n" + "="*50)
     print("🎵  VIRTUAL SOUNDBOARD 2.1 INITIALIZING...")
     print("="*50)
@@ -370,11 +412,19 @@ def initialize_app():
     audio_engine.preload_directory()
     hotkey_manager.reload_all_hotkeys()
     hotkey_manager.start_listener()
+    discord_service.start()
     print(f"Loaded {len(config_manager.config.get('sounds', []))} sounds into 3 Numpad Groups.")
     print(f"Panic Key: [{config_manager.config.get('panic_key', 'esc').upper()}]")
     print("="*50 + "\n")
 
 
+# Initialize upon module load for Gunicorn / WSGI
+if os.environ.get('GUNICORN_RUN') or os.environ.get('K_SERVICE'):
+    initialize_app()
+
+
 if __name__ == '__main__':
     initialize_app()
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=False)
+

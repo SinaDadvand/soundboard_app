@@ -32,6 +32,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Destination Toggles
     const toggleHeadsetBtn = document.getElementById('toggle-headset-btn');
     const toggleCableBtn = document.getElementById('toggle-cable-btn');
+    const toggleDiscordBtn = document.getElementById('toggle-discord-btn');
+    const discordBtnLabel = document.getElementById('discord-btn-label');
+    const discordModalStatusBadge = document.getElementById('discord-modal-status-badge');
+    const discordTokenInput = document.getElementById('discord-token-input');
+    const saveDiscordTokenBtn = document.getElementById('save-discord-token-btn');
+    const discordChannelSelect = document.getElementById('discord-channel-select');
+    const discordJoinBtn = document.getElementById('discord-join-btn');
 
     // 5 Hardware Knobs Elements
     const volumeKnob = document.getElementById('volume-knob');
@@ -848,6 +855,74 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Discord Bot Controls
+        if (toggleDiscordBtn) {
+            toggleDiscordBtn.addEventListener('click', async () => {
+                const res = await fetch('/api/discord/status');
+                const status = await res.json();
+                if (!status.configured) {
+                    settingsModal.classList.remove('hidden');
+                    if (discordTokenInput) discordTokenInput.focus();
+                } else if (status.voice_connected) {
+                    await fetch('/api/discord/leave', { method: 'POST' });
+                    await pollDiscordStatus();
+                } else {
+                    settingsModal.classList.remove('hidden');
+                }
+            });
+        }
+
+        if (saveDiscordTokenBtn) {
+            saveDiscordTokenBtn.addEventListener('click', async () => {
+                const token = discordTokenInput.value.trim();
+                if (!token) return;
+                saveDiscordTokenBtn.textContent = 'Connecting...';
+                try {
+                    const res = await fetch('/api/discord/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token })
+                    });
+                    const data = await res.json();
+                    saveDiscordTokenBtn.textContent = 'Connected!';
+                    setTimeout(() => { saveDiscordTokenBtn.textContent = 'Connect'; }, 2000);
+                    await pollDiscordStatus();
+                } catch (err) {
+                    console.error('Discord config error:', err);
+                    saveDiscordTokenBtn.textContent = 'Connect';
+                }
+            });
+        }
+
+        if (discordJoinBtn) {
+            discordJoinBtn.addEventListener('click', async () => {
+                const channelId = discordChannelSelect.value;
+                if (!channelId) {
+                    alert('Please select a voice channel.');
+                    return;
+                }
+                discordJoinBtn.textContent = 'Joining...';
+                try {
+                    const res = await fetch('/api/discord/join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ channel_id: channelId })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        discordJoinBtn.textContent = 'Connected';
+                        await pollDiscordStatus();
+                    } else {
+                        alert(data.message || 'Failed to join voice channel');
+                        discordJoinBtn.textContent = 'Join Voice';
+                    }
+                } catch (err) {
+                    console.error('Discord join error:', err);
+                    discordJoinBtn.textContent = 'Join Voice';
+                }
+            });
+        }
+
         // Dropzone Upload
         dropzone.addEventListener('click', () => fileInput.click());
         dropzone.addEventListener('dragover', (e) => {
@@ -910,6 +985,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Upload error:', err);
             }
         });
+        // Discord Status Polling
+        async function pollDiscordStatus() {
+            try {
+                const res = await fetch('/api/discord/status');
+                const st = await res.json();
+
+                if (toggleDiscordBtn && discordBtnLabel) {
+                    if (st.voice_connected) {
+                        toggleDiscordBtn.classList.add('active');
+                        discordBtnLabel.textContent = `👾 #${st.channel_name || 'Voice'}`;
+                    } else if (st.connected) {
+                        toggleDiscordBtn.classList.remove('active');
+                        discordBtnLabel.textContent = `👾 ${st.user ? st.user.split('#')[0] : 'Ready'}`;
+                    } else {
+                        toggleDiscordBtn.classList.remove('active');
+                        discordBtnLabel.textContent = `👾 Discord`;
+                    }
+                }
+
+                if (discordModalStatusBadge) {
+                    if (st.voice_connected) {
+                        discordModalStatusBadge.textContent = `Connected (${st.guild_name} ➔ #${st.channel_name})`;
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 font-medium border border-emerald-800/50';
+                    } else if (st.connected) {
+                        discordModalStatusBadge.textContent = `Bot Ready (${st.user})`;
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 font-medium border border-purple-800/50';
+                    } else if (st.configured) {
+                        discordModalStatusBadge.textContent = 'Connecting...';
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 font-medium';
+                    } else {
+                        discordModalStatusBadge.textContent = 'Idle (No Token)';
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium';
+                    }
+                }
+
+                if (discordChannelSelect && st.available_channels && st.available_channels.length > 0) {
+                    const currentVal = discordChannelSelect.value;
+                    discordChannelSelect.innerHTML = '<option value="">Select Voice Channel...</option>';
+                    st.available_channels.forEach(ch => {
+                        const opt = document.createElement('option');
+                        opt.value = ch.id;
+                        opt.textContent = ch.name;
+                        if (ch.id === st.channel_id || ch.id === currentVal) {
+                            opt.selected = true;
+                        }
+                        discordChannelSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                // Background poll ignore
+            }
+        }
+
+        pollDiscordStatus();
+        setInterval(pollDiscordStatus, 8000);
     }
 
     init();

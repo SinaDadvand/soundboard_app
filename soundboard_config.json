@@ -7,7 +7,7 @@
   "secondary_enabled": false,
   "sounds": [
     {
-      "id": "f0bd1430",
+      "id": "06823472",
       "filename": "test_replacement.mp3",
       "name": "Test Replacement Sound",
       "hotkey": "ctrl+7",
@@ -447,5 +447,8 @@
   "global_pitch": 4.0,
   "global_speed": 1.25,
   "global_echo": 0.5,
-  "global_reverb": 0.6
+  "global_reverb": 0.6,
+  "discord_token": null,
+  "discord_guild_id": "1234567890",
+  "discord_channel_id": "9876543210"
 }

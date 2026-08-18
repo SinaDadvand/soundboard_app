@@ -33,6 +33,7 @@ class AudioEngine:
         self.cable_enabled = True
         self.primary_device_name = None
         self.secondary_device_name = None
+        self.discord_service = None
 
     def set_global_fx(self, pitch=None, speed=None, echo=None, reverb=None):
         """Update global DSP modifiers affecting both hotkeys and UI clicks."""
@@ -359,11 +360,20 @@ class AudioEngine:
             reverb=reverb
         )
 
+        # 1. Stream to Discord Voice if active
+        if self.discord_service:
+            try:
+                self.discord_service.play_audio_array(audio_to_play, sr=sr)
+            except Exception as d_err:
+                print(f"[AudioEngine] Notice on Discord voice stream: {d_err}")
+
+        # 2. Local device output
         devices_to_play = []
         with self.lock:
             if self.headset_enabled:
                 h_dev = self.resolve_headphone_device()
-                devices_to_play.append(h_dev)
+                if h_dev is not None:
+                    devices_to_play.append(h_dev)
 
             if self.cable_enabled:
                 c_dev = self.resolve_cable_device()
@@ -371,7 +381,13 @@ class AudioEngine:
                     devices_to_play.append(c_dev)
 
         if not devices_to_play:
-            devices_to_play.append(self.resolve_headphone_device())
+            h_dev = self.resolve_headphone_device()
+            if h_dev is not None:
+                devices_to_play.append(h_dev)
+
+        # If running in cloud/headless environment without local audio hardware, return True
+        if not devices_to_play or all(d is None for d in devices_to_play):
+            return True
 
         stop_event = threading.Event()
         stream_entry = {

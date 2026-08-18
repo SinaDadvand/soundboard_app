@@ -154,6 +154,25 @@ class TestSoundboardE2E(unittest.TestCase):
         if os.path.exists(created_file):
             os.remove(created_file)
 
+    def test_11_discord_api(self):
+        # Status endpoint
+        st_res = self.client.get('/api/discord/status')
+        self.assertEqual(st_res.status_code, 200)
+        st_data = st_res.get_json()
+        self.assertIn('configured', st_data)
+        self.assertIn('connected', st_data)
+        self.assertIn('voice_connected', st_data)
+
+        # Config endpoint
+        cfg_res = self.client.post('/api/discord/config', json={
+            'token': '',
+            'guild_id': '1234567890',
+            'channel_id': '9876543210'
+        })
+        self.assertEqual(cfg_res.status_code, 200)
+        self.assertIn('discord', cfg_res.get_json())
+
 
 if __name__ == '__main__':
     unittest.main()
+
