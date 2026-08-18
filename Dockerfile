@@ -16,10 +16,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # - ffmpeg: audio decoding & Discord Opus voice streaming
 # - libopus0: Discord Opus audio codec
 # - libsndfile1: soundfile audio loader
+# - libportaudio2 & portaudio19-dev: PortAudio library for audio I/O
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libopus0 \
     libsndfile1 \
+    libportaudio2 \
+    portaudio19-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

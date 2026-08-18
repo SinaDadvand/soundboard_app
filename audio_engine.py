@@ -13,8 +13,15 @@ import os
 import threading
 import numpy as np
 import soundfile as sf
-import sounddevice as sd
 from scipy import signal
+
+try:
+    import sounddevice as sd
+    SOUNDDEVICE_AVAILABLE = True
+except (OSError, ImportError, Exception) as e:
+    sd = None
+    SOUNDDEVICE_AVAILABLE = False
+    print(f"[AudioEngine] Notice: sounddevice/PortAudio unavailable in headless mode ({e}).")
 
 
 class AudioEngine:
@@ -50,6 +57,8 @@ class AudioEngine:
 
     def list_output_devices(self):
         """Return a list of all available output devices on the system."""
+        if not SOUNDDEVICE_AVAILABLE or sd is None:
+            return []
         devices = []
         try:
             raw_devices = sd.query_devices()
