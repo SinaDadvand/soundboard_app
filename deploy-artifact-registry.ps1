@@ -13,7 +13,7 @@ param(
     [string]$RepoName = "soundboard-repo",
     [string]$ServiceName = "soundboard-app-auth",
     [string]$ImageName = "soundboard-app-auth",
-    [string]$AllowedUserGroup = "soundboard-app-users-adt@yourdomain.com",
+    [string]$AllowedUsers = "sina.dadvand@gmail.com",
     [string]$DiscordBotToken = ""
 )
 
@@ -25,7 +25,7 @@ Write-Host "==========================================================" -Foregro
 
 # 1. Ensure required Google Cloud APIs are enabled
 Write-Host "`n[1/4] Checking & enabling required GCP APIs..." -ForegroundColor Yellow
-gcloud services enable artifactregistry.googleapis.com cloudbuild.googleapis.com run.googleapis.com cloudidentity.googleapis.com --project=$ProjectId
+gcloud services enable artifactregistry.googleapis.com cloudbuild.googleapis.com run.googleapis.com --project=$ProjectId
 
 # 2. Ensure Artifact Registry Docker repository exists
 Write-Host "`n[2/4] Verifying Artifact Registry repository '$RepoName'..." -ForegroundColor Yellow
@@ -49,7 +49,7 @@ gcloud builds submit --tag $FullImageTag --project=$ProjectId .
 # 4. Deploy New Independent Cloud Run Service from Artifact Registry Image
 Write-Host "`n[4/4] Deploying Cloud Run service '$ServiceName' from Artifact Registry image..." -ForegroundColor Yellow
 
-$envVars = "ALLOWED_USER_GROUP=$AllowedUserGroup,FIREBASE_PROJECT_ID=$ProjectId"
+$envVars = "ALLOWED_USERS=$AllowedUsers,FIREBASE_PROJECT_ID=$ProjectId"
 if ($DiscordBotToken -and $DiscordBotToken.Trim() -ne "") {
     $envVars += ",DISCORD_BOT_TOKEN=$DiscordBotToken"
 }

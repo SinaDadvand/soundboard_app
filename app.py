@@ -127,7 +127,6 @@ def api_auth_me():
             'name': user.get('name') or user.get('display_name'),
             'picture': user.get('picture')
         },
-        'allowed_group': auth_service.allowed_group,
         'authorized': True
     })
 

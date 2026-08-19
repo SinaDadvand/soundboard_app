@@ -1,10 +1,10 @@
 /**
- * Firebase Authentication & Google Group RBAC Controller
- * ======================================================
+ * Firebase Authentication & Email Allowlist Authorization Controller
+ * =================================================================
  * - Initializes Firebase Web SDK v10 (compat) dynamically from backend config
  * - Google Sign-In with popup (GoogleAuthProvider)
  * - Transparent Bearer token injection for all API requests (authenticatedFetch)
- * - Real-time auth state handling & 403 Forbidden Access Denied feedback
+ * - Real-time auth state handling & 403 Forbidden sign-out with user alert
  */
 
 (function() {
@@ -116,8 +116,9 @@
                 });
 
                 if (meRes.status === 403) {
-                    const data = await meRes.json();
-                    showForbiddenModal(data.message || 'Your account is not authorized to access this application.');
+                    const data = await meRes.json().catch(() => ({}));
+                    await signOutUser();
+                    showForbiddenModal(data.error || 'Your Google account is not authorized to access this app.');
                     return;
                 }
 
@@ -174,7 +175,7 @@
         if (authForbiddenModal) authForbiddenModal.classList.remove('hidden');
         if (authBarrierModal) authBarrierModal.classList.add('hidden');
         if (authForbiddenMsg) {
-            authForbiddenMsg.textContent = msg;
+            authForbiddenMsg.textContent = msg || 'Your Google account is not authorized to access this app.';
         }
     }
 
@@ -208,9 +209,11 @@
             console.warn('[Auth] Received 403 Forbidden from backend.');
             try {
                 const errData = await response.clone().json();
-                showForbiddenModal(errData.message || 'Access Denied: Your account is not authorized to access this application.');
+                await signOutUser();
+                showForbiddenModal(errData.error || errData.message || 'Your Google account is not authorized to access this app.');
             } catch (e) {
-                showForbiddenModal('Access Denied: Your account is not authorized to access this application.');
+                await signOutUser();
+                showForbiddenModal('Your Google account is not authorized to access this app.');
             }
         }
 

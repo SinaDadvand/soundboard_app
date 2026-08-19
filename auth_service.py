@@ -2,44 +2,14 @@
 Authentication & Authorization Service for Virtual Soundboard
 ============================================================
 - Google Sign-In verification via Firebase Authentication (firebase-admin)
-- Role-Based Access Control (RBAC) via Google Cloud Identity API (Google Groups)
-- High-performance in-memory TTL caching for instant soundboard responsiveness
+- Email allowlist Role-Based Access Control via ALLOWED_USERS env variable
 - Seamless local development bypass (DISABLE_AUTH=true)
 """
 
 import os
-import time
 import functools
 import logging
 from flask import request, jsonify, g
-
-try:
-    from cachetools import TTLCache
-except (ImportError, Exception):
-    class TTLCache(dict):
-        """Lightweight fallback in-memory TTL Cache."""
-        def __init__(self, maxsize=1000, ttl=300):
-            super().__init__()
-            self._ttl = ttl
-            self._times = {}
-
-        def __setitem__(self, key, value):
-            self._times[key] = time.time()
-            super().__setitem__(key, value)
-
-        def __getitem__(self, key):
-            if key in self and time.time() - self._times.get(key, 0) < self._ttl:
-                return super().__getitem__(key)
-            self.pop(key, None)
-            self._times.pop(key, None)
-            raise KeyError(key)
-
-        def __contains__(self, key):
-            if super().__contains__(key) and time.time() - self._times.get(key, 0) < self._ttl:
-                return True
-            self.pop(key, None)
-            self._times.pop(key, None)
-            return False
 
 # Configure logger
 logger = logging.getLogger('auth_service')
@@ -49,7 +19,6 @@ logger.setLevel(logging.INFO)
 try:
     import firebase_admin
     from firebase_admin import auth as firebase_auth
-    from firebase_admin import credentials
     FIREBASE_ADMIN_AVAILABLE = True
 except (ImportError, Exception) as e:
     firebase_admin = None
@@ -57,34 +26,23 @@ except (ImportError, Exception) as e:
     FIREBASE_ADMIN_AVAILABLE = False
     logger.warning(f"[AuthService] firebase-admin not installed: {e}")
 
-# Optional Google Cloud Identity API
-try:
-    from googleapiclient.discovery import build as google_api_build
-    import google.auth
-    CLOUD_IDENTITY_AVAILABLE = True
-except (ImportError, Exception) as e:
-    google_api_build = None
-    CLOUD_IDENTITY_AVAILABLE = False
-    logger.warning(f"[AuthService] google-api-python-client not installed: {e}")
-
 
 class AuthService:
     def __init__(self):
         self.project_id = os.environ.get('FIREBASE_PROJECT_ID') or os.environ.get('GCP_PROJECT') or os.environ.get('GOOGLE_CLOUD_PROJECT')
-        self.allowed_group = os.environ.get('ALLOWED_USER_GROUP')
         self.disable_auth = os.environ.get('DISABLE_AUTH', '').lower() in ('true', '1', 'yes')
 
-        # In-memory TTL caches:
-        # Group name lookup: cached for 1 hour
-        self._group_name_cache = TTLCache(maxsize=100, ttl=3600)
-        # User membership result: cached for 5 minutes (300 seconds)
-        self._membership_cache = TTLCache(maxsize=5000, ttl=300)
+        # Parse ALLOWED_USERS environment variable on startup into a normalized, trimmed list of lowercased emails
+        raw_allowed = os.environ.get('ALLOWED_USERS', '')
+        self.allowed_users = set(
+            email.strip().lower()
+            for email in raw_allowed.split(',')
+            if email.strip()
+        )
+        logger.info(f"[AuthService] Initialized with {len(self.allowed_users)} authorized email(s).")
 
         self._firebase_initialized = False
-        self._cloud_identity_client = None
-
         self._init_firebase()
-        self._init_cloud_identity()
 
     def _init_firebase(self):
         """Initialize Firebase Admin SDK using Application Default Credentials (ADC)."""
@@ -105,88 +63,17 @@ class AuthService:
         else:
             self._firebase_initialized = True
 
-    def _init_cloud_identity(self):
-        """Initialize Google Cloud Identity v1 API client."""
-        if not CLOUD_IDENTITY_AVAILABLE or self.disable_auth:
-            return
-
-        try:
-            creds, _ = google.auth.default(scopes=['https://www.googleapis.com/auth/cloud-identity.groups.readonly'])
-            self._cloud_identity_client = google_api_build('cloudidentity', 'v1', credentials=creds, cache_discovery=False)
-            logger.info("[AuthService] Cloud Identity API client initialized successfully.")
-        except Exception as e:
-            try:
-                # Fallback with default discovery
-                creds, _ = google.auth.default()
-                self._cloud_identity_client = google_api_build('cloudidentity', 'v1', credentials=creds, cache_discovery=False)
-                logger.info("[AuthService] Cloud Identity API client initialized with default credentials.")
-            except Exception as e2:
-                logger.warning(f"[AuthService] Could not initialize Cloud Identity client: {e2}")
-                self._cloud_identity_client = None
-
-    def get_group_resource_name(self, group_email: str) -> str:
-        """Lookup Cloud Identity group resource name (e.g., 'groups/0123456789') by group email."""
-        if not group_email:
-            return None
-
-        clean_email = group_email.strip().lower()
-        if clean_email in self._group_name_cache:
-            return self._group_name_cache[clean_email]
-
-        if not self._cloud_identity_client:
-            return None
-
-        try:
-            req = self._cloud_identity_client.groups().lookup(groupKey_id=clean_email)
-            res = req.execute()
-            group_name = res.get('name')
-            if group_name:
-                self._group_name_cache[clean_email] = group_name
-                return group_name
-        except Exception as e:
-            logger.error(f"[AuthService] Error looking up Cloud Identity group '{clean_email}': {e}")
-
-        return None
-
-    def check_group_membership(self, user_email: str, group_email: str = None) -> bool:
-        """Check if user is a direct or indirect (transitive) member of the designated Google Group."""
-        target_group = group_email or self.allowed_group
-        if not target_group:
-            # If no group restriction is configured, allow all authenticated users
+    def is_user_authorized(self, email: str) -> bool:
+        """Check if email is in the allowed users list."""
+        if not self.allowed_users:
+            # If no email allowlist is configured, allow all authenticated users
             return True
 
-        if not user_email:
+        if not email:
             return False
 
-        clean_user = user_email.strip().lower()
-        clean_group = target_group.strip().lower()
-        cache_key = f"{clean_user}:{clean_group}"
-
-        if cache_key in self._membership_cache:
-            return self._membership_cache[cache_key]
-
-        if not self._cloud_identity_client:
-            logger.warning("[AuthService] Cloud Identity API client not active. Rejecting group check.")
-            return False
-
-        group_resource = self.get_group_resource_name(clean_group)
-        if not group_resource:
-            logger.error(f"[AuthService] Could not resolve group resource name for '{clean_group}'.")
-            return False
-
-        try:
-            req = self._cloud_identity_client.groups().memberships().checkTransitiveMembership(
-                parent=group_resource,
-                query=f"member_key_id == '{clean_user}'"
-            )
-            res = req.execute()
-            has_membership = bool(res.get('hasSubmembership', False))
-            self._membership_cache[cache_key] = has_membership
-            logger.info(f"[AuthService] Group check for '{clean_user}' in '{clean_group}': {has_membership}")
-            return has_membership
-        except Exception as e:
-            logger.error(f"[AuthService] Transitive membership check failed for '{clean_user}': {e}")
-            return False
+        normalized_email = email.strip().lower()
+        return normalized_email in self.allowed_users
 
     def verify_token(self, token: str):
         """Verify Firebase ID Token and return decoded payload."""
@@ -204,7 +91,6 @@ class AuthService:
             'storageBucket': os.environ.get('FIREBASE_STORAGE_BUCKET', f"{self.project_id}.appspot.com" if self.project_id else ''),
             'messagingSenderId': os.environ.get('FIREBASE_MESSAGING_SENDER_ID', ''),
             'appId': os.environ.get('FIREBASE_APP_ID', ''),
-            'allowedGroup': self.allowed_group or '',
             'authEnabled': not self.disable_auth
         }
 
@@ -214,7 +100,7 @@ auth_service = AuthService()
 
 
 def require_auth(f):
-    """Flask route decorator enforcing Firebase ID Token authentication and Google Group RBAC."""
+    """Flask route decorator enforcing Firebase ID Token authentication and ALLOWED_USERS email authorization."""
     @functools.wraps(f)
     def decorated_function(*args, **kwargs):
         if auth_service.disable_auth:
@@ -253,22 +139,12 @@ def require_auth(f):
             }), 401
 
         user_email = decoded_token.get('email')
-        if not user_email:
+        if not user_email or not auth_service.is_user_authorized(user_email):
             return jsonify({
                 'status': 'error',
-                'error': 'Forbidden',
-                'message': 'Authenticated account does not have an associated email address.'
+                'error': 'Access Denied: Your account is not authorized to access this application.',
+                'message': 'Access Denied: Your account is not authorized to access this application.'
             }), 403
-
-        # Validate Google Group membership
-        if auth_service.allowed_group:
-            is_authorized = auth_service.check_group_membership(user_email)
-            if not is_authorized:
-                return jsonify({
-                    'status': 'error',
-                    'error': 'Forbidden',
-                    'message': f'Access Denied: Your account ({user_email}) is not a member of the required group ({auth_service.allowed_group}).'
-                }), 403
 
         g.current_user = decoded_token
         return f(*args, **kwargs)
