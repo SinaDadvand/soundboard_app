@@ -1,30 +1,41 @@
-# GCP Cloud Run Deployment Guide (Project: `p-np-adt-de`)
+# GCP Cloud Run & Artifact Registry Deployment Guide (Project: `p-np-adt-de`)
 
-This guide explains how to deploy the containerized Virtual Soundboard to **Google Cloud Run** in project `p-np-adt-de` with **$0.00 cost** guaranteed under GCP's Free Tier.
+This guide explains how to build the Docker image, push it directly to **Google Cloud Artifact Registry**, and deploy it to **Google Cloud Run** under a new, independent service name (`soundboard-app-auth`) while keeping your existing `soundboard-app-git` service 100% untouched.
 
 ---
 
 ## 1. Zero-Cost Guarantee & Free Tier Limits
 
-Google Cloud Run includes a **generous free tier that renews every month** per billing account:
+Google Cloud Run & Artifact Registry include a generous monthly free tier:
 
 | Free Tier Resource | Free Quota Per Month |
 | :--- | :--- |
-| **Requests** | **2 Million Requests** / month free |
-| **Compute Time** | **360,000 vCPU-seconds** / month free (100 hours of continuous active CPU) |
+| **Cloud Run Requests** | **2 Million Requests** / month free |
+| **Compute Time** | **360,000 vCPU-seconds** / month free |
 | **Memory Time** | **180,000 GiB-seconds** / month free |
+| **Artifact Registry Storage** | **0.5 GB** free storage / month |
 | **Network Egress** | **1 GiB** free egress to North America / month |
-
-### Why this setup stays $0.00:
-1. **Scale to Zero (`--min-instances=0`)**: When nobody is using the soundboard, 0 container instances run. You pay **$0.00**.
-2. **CPU Throttling (`--cpu-throttling`)**: CPU is only allocated during active HTTP requests or sound streaming, avoiding background idle compute charges.
-3. **Small Resource Footprint (`512MiB RAM`, `1 vCPU`)**: Uses minimal memory.
 
 ---
 
-## 2. Deploying via `gcloud` CLI (Source Deploy)
+## 2. One-Click Deployment Script (`deploy-artifact-registry.ps1`)
 
-If you have the Google Cloud SDK (`gcloud`) installed:
+From within the `soundboard_app` folder in PowerShell, run:
+
+```powershell
+.\deploy-artifact-registry.ps1 -AllowedUserGroup "soundboard-app-users-adt@yourdomain.com"
+```
+
+### What this script automatically does:
+1. Enables required GCP APIs (`artifactregistry`, `cloudbuild`, `run`, `cloudidentity`).
+2. Creates the Artifact Registry Docker repository (`soundboard-repo` in `us-west1`) if it doesn't already exist.
+3. Builds your Docker container using Google Cloud Build and pushes it to:
+   `us-west1-docker.pkg.dev/p-np-adt-de/soundboard-repo/soundboard-app-auth:latest`
+4. Deploys a new, dedicated Cloud Run service: **`soundboard-app-auth`** with your `ALLOWED_USER_GROUP` environment variable configured.
+
+---
+
+## 3. Manual Step-by-Step Deployment (CLI)
 
 ### Step A: Authenticate & Set Project
 ```bash
@@ -32,63 +43,60 @@ gcloud auth login
 gcloud config set project p-np-adt-de
 ```
 
-### Step B: Enable Required Services (One-Time)
+### Step B: Enable Required Services
 ```bash
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+gcloud services enable artifactregistry.googleapis.com cloudbuild.googleapis.com run.googleapis.com cloudidentity.googleapis.com
 ```
 
-### Step C: Deploy Direct from Source to Cloud Run
-Run this single command from within the `soundboard_app` directory:
+### Step C: Create Artifact Registry Repository (One-Time)
 ```bash
-gcloud run deploy soundboard-app \
+gcloud artifacts repositories create soundboard-repo \
+  --repository-format=docker \
+  --location=us-west1 \
+  --description="Docker repository for Soundboard App containers" \
+  --project=p-np-adt-de
+```
+
+### Step D: Build & Push Image via Cloud Build
+```bash
+gcloud builds submit \
+  --tag=us-west1-docker.pkg.dev/p-np-adt-de/soundboard-repo/soundboard-app-auth:latest \
+  --project=p-np-adt-de .
+```
+
+### Step E: Deploy to New Cloud Run Service (`soundboard-app-auth`)
+```bash
+gcloud run deploy soundboard-app-auth \
+  --image=us-west1-docker.pkg.dev/p-np-adt-de/soundboard-repo/soundboard-app-auth:latest \
   --project=p-np-adt-de \
-  --region=us-central1 \
-  --source=. \
+  --region=us-west1 \
   --port=8080 \
   --min-instances=0 \
   --max-instances=1 \
   --memory=512Mi \
   --cpu=1 \
-  --cpu-throttling \
   --allow-unauthenticated \
-  --set-env-vars="DISCORD_BOT_TOKEN=YOUR_DISCORD_BOT_TOKEN_HERE"
+  --set-env-vars="ALLOWED_USER_GROUP=soundboard-app-users-adt@yourdomain.com,FIREBASE_PROJECT_ID=p-np-adt-de"
 ```
 
 ---
 
-## 3. Deploying via Google Cloud Console (Web UI)
+## 4. Terraform Infrastructure as Code
 
-If you prefer using the browser without installing `gcloud`:
-
-1. Open **[Google Cloud Run Console](https://console.cloud.google.com/run?project=p-np-adt-de)**.
-2. Click **Create Service**.
-3. Choose **Continuously deploy from a repository** (connect your GitHub repo `SinaDadvand/soundboard_app` branch `feature/containerized` or `main`) OR upload via Cloud Shell.
-4. **Service settings**:
-   * Service name: `soundboard-app`
-   * Region: `us-central1` (Iowa) or your preferred region.
-   * Authentication: **Allow unauthenticated invocations**.
-5. **Container, Networking, Security (Advanced Settings)**:
-   * **Container Port**: `8080`
-   * **Memory**: `512 MiB` (or `1 GiB`)
-   * **CPU**: `1`
-   * **Execution Environment**: Default (Second generation)
-   * **CPU allocation**: *CPU is only allocated during request processing* (CPU throttling enabled)
-   * **Autoscaling**: Minimum instances = `0`, Maximum instances = `1`
-6. **Environment Variables**:
-   * Add Name: `DISCORD_BOT_TOKEN`, Value: `your_token_here`
-7. Click **Create**.
-8. Once deployed, Cloud Run will provide your live HTTPS URL (e.g., `https://soundboard-app-xyz.a.run.app`).
-
----
-
-## 4. Setting Up with Terraform (Future Repo)
-
-When you are ready to manage infrastructure as code in your separate Terraform repository, here is the complete Terraform resource definition:
+When deploying via Terraform, reference the Artifact Registry container image directly:
 
 ```hcl
-resource "google_cloud_run_v2_service" "soundboard" {
-  name     = "soundboard-app"
-  location = "us-central1"
+resource "google_artifact_registry_repository" "soundboard_repo" {
+  location      = "us-west1"
+  repository_id = "soundboard-repo"
+  description   = "Docker repository for Soundboard App containers"
+  format        = "DOCKER"
+  project       = "p-np-adt-de"
+}
+
+resource "google_cloud_run_v2_service" "soundboard_auth" {
+  name     = "soundboard-app-auth"
+  location = "us-west1"
   project  = "p-np-adt-de"
 
   template {
@@ -98,7 +106,7 @@ resource "google_cloud_run_v2_service" "soundboard" {
     }
 
     containers {
-      image = "gcr.io/p-np-adt-de/soundboard-app:latest"
+      image = "us-west1-docker.pkg.dev/p-np-adt-de/soundboard-repo/soundboard-app-auth:latest"
 
       resources {
         limits = {
@@ -106,6 +114,16 @@ resource "google_cloud_run_v2_service" "soundboard" {
           memory = "512Mi"
         }
         cpu_idle = true
+      }
+
+      env {
+        name  = "ALLOWED_USER_GROUP"
+        value = "soundboard-app-users-adt@yourdomain.com"
+      }
+
+      env {
+        name  = "FIREBASE_PROJECT_ID"
+        value = "p-np-adt-de"
       }
 
       env {
@@ -121,9 +139,9 @@ resource "google_cloud_run_v2_service" "soundboard" {
 }
 
 resource "google_cloud_run_service_iam_member" "public_access" {
-  location = google_cloud_run_v2_service.soundboard.location
-  project  = google_cloud_run_v2_service.soundboard.project
-  service  = google_cloud_run_v2_service.soundboard.name
+  location = google_cloud_run_v2_service.soundboard_auth.location
+  project  = google_cloud_run_v2_service.soundboard_auth.project
+  service  = google_cloud_run_v2_service.soundboard_auth.name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
