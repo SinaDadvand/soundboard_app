@@ -6,18 +6,20 @@ Flask server providing REST APIs and modern UI for:
 - Dual audio output routing (Speakers + Virtual Audio Cable for OBS/Discord)
 - 3-Column Numpad Layout (Ctrl, Alt, Ctrl+Alt groups)
 - Global Volume Rotary Knob, Panic Stop (Esc), and Sound Upload
+- Firebase Authentication (Google Sign-In) and Cloud Identity Google Group RBAC
 """
 
 import sys
 import os
 import time
-from flask import Flask, render_template, send_from_directory, jsonify, request
+from flask import Flask, render_template, send_from_directory, jsonify, request, g
 from werkzeug.utils import secure_filename
 
 from audio_engine import AudioEngine
 from config_manager import ConfigManager
 from hotkey_manager import HotkeyManager
 from discord_service import DiscordService
+from auth_service import auth_service, require_auth
 
 app = Flask(__name__)
 
@@ -104,9 +106,37 @@ def serve_audio(filename):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# REST API Endpoints
+# Authentication & Authorization Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route('/api/auth/config', methods=['GET'])
+def api_auth_config():
+    """Public endpoint to fetch Firebase client configuration."""
+    return jsonify(auth_service.get_client_config())
+
+
+@app.route('/api/auth/me', methods=['GET'])
+@require_auth
+def api_auth_me():
+    """Return currently authenticated and authorized user metadata."""
+    user = getattr(g, 'current_user', {})
+    return jsonify({
+        'status': 'success',
+        'user': {
+            'uid': user.get('uid'),
+            'email': user.get('email'),
+            'name': user.get('name') or user.get('display_name'),
+            'picture': user.get('picture')
+        },
+        'allowed_group': auth_service.allowed_group,
+        'authorized': True
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API Endpoints (Protected by @require_auth)
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/status', methods=['GET'])
+@require_auth
 def api_status():
     return jsonify({
         'status': 'ok',
@@ -124,6 +154,7 @@ def api_status():
 
 
 @app.route('/api/global_fx', methods=['GET', 'POST'])
+@require_auth
 def api_global_fx():
     if request.method == 'POST':
         data = request.get_json() or {}
@@ -150,6 +181,7 @@ def api_global_fx():
 
 
 @app.route('/api/routing_toggle', methods=['POST'])
+@require_auth
 def api_routing_toggle():
     data = request.get_json() or {}
     headset = bool(data.get('headset_enabled', True))
@@ -167,6 +199,7 @@ def api_routing_toggle():
 
 
 @app.route('/api/devices', methods=['GET'])
+@require_auth
 def api_get_devices():
     devices = audio_engine.list_output_devices()
     return jsonify({
@@ -180,6 +213,7 @@ def api_get_devices():
 
 
 @app.route('/api/devices', methods=['POST'])
+@require_auth
 def api_set_devices():
     data = request.get_json() or {}
     primary = data.get('primary_device')
@@ -201,6 +235,7 @@ def api_set_devices():
 
 
 @app.route('/api/sounds', methods=['GET'])
+@require_auth
 def api_get_sounds():
     return jsonify({
         'sounds': config_manager.config.get('sounds', []),
@@ -210,6 +245,7 @@ def api_get_sounds():
 
 
 @app.route('/api/sounds/upload', methods=['POST'])
+@require_auth
 def api_upload_sound():
     if 'file' not in request.files:
         return jsonify({'status': 'error', 'message': 'No file uploaded'}), 400
@@ -250,6 +286,7 @@ def api_upload_sound():
 
 
 @app.route('/api/sounds/<sound_id>/edit', methods=['POST'])
+@require_auth
 def api_edit_sound(sound_id):
     data = request.get_json() or {}
     sound = config_manager.get_sound_by_id(sound_id)
@@ -275,6 +312,7 @@ def api_edit_sound(sound_id):
 
 
 @app.route('/api/sounds/<sound_id>/rebind', methods=['POST'])
+@require_auth
 def api_rebind_sound(sound_id):
     data = request.get_json() or {}
     new_hotkey = data.get('hotkey')
@@ -285,6 +323,7 @@ def api_rebind_sound(sound_id):
 
 
 @app.route('/api/sounds/<sound_id>', methods=['DELETE'])
+@require_auth
 def api_delete_sound(sound_id):
     success = config_manager.delete_sound(sound_id, delete_file=True)
     if success:
@@ -294,6 +333,7 @@ def api_delete_sound(sound_id):
 
 
 @app.route('/api/play/<sound_id>', methods=['POST', 'GET'])
+@require_auth
 def api_play_sound(sound_id):
     sound = config_manager.get_sound_by_id(sound_id)
     if not sound:
@@ -334,18 +374,21 @@ def api_play_sound(sound_id):
 
 
 @app.route('/api/stop', methods=['POST', 'GET'])
+@require_auth
 def api_stop_all():
     audio_engine.stop_all()
     return jsonify({'status': 'success', 'message': 'Stopped all playback'})
 
 
 @app.route('/api/sounds/<sound_id>/stop', methods=['POST'])
+@require_auth
 def api_stop_sound(sound_id):
     audio_engine.stop_sound(sound_id)
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/master_volume', methods=['POST'])
+@require_auth
 def api_set_master_volume():
     data = request.get_json() or {}
     vol = float(data.get('volume', 1.0))
@@ -357,6 +400,7 @@ def api_set_master_volume():
 
 
 @app.route('/api/panic_key', methods=['POST'])
+@require_auth
 def api_set_panic_key():
     data = request.get_json() or {}
     key = data.get('panic_key', 'esc')
@@ -368,11 +412,13 @@ def api_set_panic_key():
 # Discord Bot REST Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 @app.route('/api/discord/status', methods=['GET'])
+@require_auth
 def api_discord_status():
     return jsonify(discord_service.get_status())
 
 
 @app.route('/api/discord/join', methods=['POST'])
+@require_auth
 def api_discord_join():
     data = request.get_json() or {}
     channel_id = data.get('channel_id') or discord_service.default_channel_id
@@ -386,6 +432,7 @@ def api_discord_join():
 
 
 @app.route('/api/discord/leave', methods=['POST'])
+@require_auth
 def api_discord_leave():
     success, msg = discord_service.leave_channel()
     if success:
@@ -394,6 +441,7 @@ def api_discord_leave():
 
 
 @app.route('/api/discord/config', methods=['POST'])
+@require_auth
 def api_discord_config():
     data = request.get_json() or {}
     token = data.get('token')
@@ -406,7 +454,7 @@ def api_discord_config():
 def initialize_app():
     """Load config, preload audio files, register hotkeys, start keyboard listener & Discord bot."""
     print("\n" + "="*50)
-    print("🎵  VIRTUAL SOUNDBOARD 2.1 INITIALIZING...")
+    print("🎵  VIRTUAL SOUNDBOARD 2.2 (AUTH & RBAC ENABLED) INITIALIZING...")
     print("="*50)
     config_manager.sync_audio_files(config_manager.config)
     audio_engine.preload_directory()
@@ -415,6 +463,12 @@ def initialize_app():
     discord_service.start()
     print(f"Loaded {len(config_manager.config.get('sounds', []))} sounds into 3 Numpad Groups.")
     print(f"Panic Key: [{config_manager.config.get('panic_key', 'esc').upper()}]")
+    if auth_service.allowed_group:
+        print(f"🔒 Access Control Group: {auth_service.allowed_group}")
+    elif auth_service.disable_auth:
+        print("🔓 Auth Mode: DISABLED (Local Development)")
+    else:
+        print("🔑 Auth Mode: All Authenticated Google Users")
     print("="*50 + "\n")
 
 
@@ -427,4 +481,3 @@ if __name__ == '__main__':
     initialize_app()
     port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port, debug=False)
-

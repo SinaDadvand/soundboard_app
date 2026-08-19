@@ -9,6 +9,14 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Helper to route all API calls with Firebase Authorization Bearer Token
+    const apiFetch = (url, options) => {
+        if (window.authenticatedFetch) {
+            return window.authenticatedFetch(url, options);
+        }
+        return fetch(url, options);
+    };
+
     // State
     let sounds = [];
     let masterVolume = 1.0;
@@ -111,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadSounds() {
         try {
-            const res = await fetch('/api/status');
+            const res = await apiFetch('/api/status');
             const statusData = await res.json();
             
             masterVolume = statusData.master_volume !== undefined ? statusData.master_volume : 1.0;
@@ -130,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
             panicKeyBadge.textContent = panicKey.toUpperCase();
             panicKeyInput.value = panicKey;
 
-            const sRes = await fetch('/api/sounds');
+            const sRes = await apiFetch('/api/sounds');
             const sData = await sRes.json();
             sounds = sData.sounds || [];
 
@@ -142,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadDevices() {
         try {
-            const res = await fetch('/api/devices');
+            const res = await apiFetch('/api/devices');
             const data = await res.json();
             
             if (data.headset_enabled !== undefined) {
@@ -405,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function syncDestinationToggles() {
         try {
-            const res = await fetch('/api/routing_toggle', {
+            const res = await apiFetch('/api/routing_toggle', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -436,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setCardPlayingVisual(sound.id, true);
 
         try {
-            await fetch(`/api/play/${sound.id}`, {
+            await apiFetch(`/api/play/${sound.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -492,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function stopSound(soundId) {
         setCardPlayingVisual(soundId, false);
         try {
-            await fetch(`/api/sounds/${soundId}/stop`, { method: 'POST' });
+            await apiFetch(`/api/sounds/${soundId}/stop`, { method: 'POST' });
         } catch (err) {
             console.error('Stop error:', err);
         }
@@ -514,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            await fetch('/api/stop', { method: 'POST' });
+            await apiFetch('/api/stop', { method: 'POST' });
         } catch (err) {
             console.error('Panic stop error:', err);
         }
@@ -522,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function updateSoundConfig(soundId, updates) {
         try {
-            await fetch(`/api/sounds/${soundId}/edit`, {
+            await apiFetch(`/api/sounds/${soundId}/edit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates)
@@ -576,7 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(globalFxDebounceTimer);
         globalFxDebounceTimer = setTimeout(async () => {
             try {
-                await fetch('/api/global_fx', {
+                await apiFetch('/api/global_fx', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -641,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
             0.0, 1.0, 0.05,
             (val) => { masterVolume = val; updateVolumeKnobVisual(val); },
             async () => {
-                await fetch('/api/master_volume', {
+                await apiFetch('/api/master_volume', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ volume: masterVolume })
@@ -742,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function finalizeRebind(keyStr) {
         if (!rebindingSoundId) return;
         try {
-            const res = await fetch(`/api/sounds/${rebindingSoundId}/rebind`, {
+            const res = await apiFetch(`/api/sounds/${rebindingSoundId}/rebind`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ hotkey: keyStr })
@@ -818,7 +826,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const secondary = secondaryDeviceSelect.value !== '' ? secondaryDeviceSelect.value : null;
 
             try {
-                await fetch('/api/devices', {
+                await apiFetch('/api/devices', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -830,12 +838,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // If a Discord channel is selected, join it
                 if (discordChannelSelect && discordChannelSelect.value) {
-                    await fetch('/api/discord/join', {
+                    await apiFetch('/api/discord/join', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ channel_id: discordChannelSelect.value })
                     });
                     await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
                 }
 
                 alert('Settings saved and connected!');
@@ -849,7 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
         savePanicKeyBtn.addEventListener('click', async () => {
             const key = panicKeyInput.value.trim().toLowerCase();
             if (key) {
-                await fetch('/api/panic_key', {
+                await apiFetch('/api/panic_key', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ panic_key: key })
@@ -870,14 +886,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Discord Bot Controls
         if (toggleDiscordBtn) {
             toggleDiscordBtn.addEventListener('click', async () => {
-                const res = await fetch('/api/discord/status');
+                const res = await apiFetch('/api/discord/status');
                 const status = await res.json();
                 if (!status.configured) {
                     settingsModal.classList.remove('hidden');
                     if (discordTokenInput) discordTokenInput.focus();
                 } else if (status.voice_connected) {
-                    await fetch('/api/discord/leave', { method: 'POST' });
+                    await apiFetch('/api/discord/leave', { method: 'POST' });
                     await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
                 } else {
                     settingsModal.classList.remove('hidden');
                 }
@@ -890,7 +914,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!token) return;
                 saveDiscordTokenBtn.textContent = 'Connecting...';
                 try {
-                    const res = await fetch('/api/discord/config', {
+                    const res = await apiFetch('/api/discord/config', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ token })
@@ -899,6 +923,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     saveDiscordTokenBtn.textContent = 'Connected!';
                     setTimeout(() => { saveDiscordTokenBtn.textContent = 'Connect'; }, 2000);
                     await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
                 } catch (err) {
                     console.error('Discord config error:', err);
                     saveDiscordTokenBtn.textContent = 'Connect';
@@ -915,7 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 discordJoinBtn.textContent = 'Joining...';
                 try {
-                    const res = await fetch('/api/discord/join', {
+                    const res = await apiFetch('/api/discord/join', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ channel_id: channelId })
@@ -924,6 +956,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.status === 'success') {
                         discordJoinBtn.textContent = 'Connected';
                         await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
                     } else {
                         alert(data.message || 'Failed to join voice channel');
                         discordJoinBtn.textContent = 'Join Voice';
@@ -980,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('hotkey', uploadHotkeyInput.value);
 
             try {
-                const res = await fetch('/api/sounds/upload', {
+                const res = await apiFetch('/api/sounds/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -1000,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Discord Status Polling
         async function pollDiscordStatus() {
             try {
-                const res = await fetch('/api/discord/status');
+                const res = await apiFetch('/api/discord/status');
                 const st = await res.json();
 
                 if (toggleDiscordBtn && discordBtnLabel) {
@@ -1054,6 +1094,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
         setInterval(pollDiscordStatus, 8000);
     }
 

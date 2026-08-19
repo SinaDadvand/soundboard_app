@@ -15,6 +15,8 @@ class TestSoundboardE2E(unittest.TestCase):
     def setUpClass(cls):
         app.config['TESTING'] = True
         cls.client = app.test_client()
+        from auth_service import auth_service
+        auth_service.disable_auth = True
 
     def test_01_index_page(self):
         res = self.client.get('/')
@@ -172,7 +174,78 @@ class TestSoundboardE2E(unittest.TestCase):
         self.assertEqual(cfg_res.status_code, 200)
         self.assertIn('discord', cfg_res.get_json())
 
+    def test_12_auth_config_public_endpoint(self):
+        res = self.client.get('/api/auth/config')
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn('apiKey', data)
+        self.assertIn('projectId', data)
+        self.assertIn('authEnabled', data)
+
+    def test_13_auth_unauthorized_when_auth_enabled(self):
+        from auth_service import auth_service
+        orig_disable = auth_service.disable_auth
+        try:
+            auth_service.disable_auth = False
+            # Request without Bearer token
+            res = self.client.get('/api/sounds')
+            self.assertEqual(res.status_code, 401)
+            self.assertEqual(res.get_json()['error'], 'Unauthorized')
+        finally:
+            auth_service.disable_auth = orig_disable
+
+    def test_14_auth_forbidden_when_not_in_group(self):
+        from auth_service import auth_service
+        from unittest.mock import patch
+
+        orig_disable = auth_service.disable_auth
+        orig_group = auth_service.allowed_group
+        try:
+            auth_service.disable_auth = False
+            auth_service.allowed_group = 'soundboard-authorized@example.com'
+
+            with patch.object(auth_service, 'verify_token', return_value={'email': 'unauthorized@example.com', 'uid': '123'}):
+                with patch.object(auth_service, 'check_group_membership', return_value=False):
+                    res = self.client.get('/api/sounds', headers={'Authorization': 'Bearer mock-token'})
+                    self.assertEqual(res.status_code, 403)
+                    self.assertEqual(res.get_json()['error'], 'Forbidden')
+        finally:
+            auth_service.disable_auth = orig_disable
+            auth_service.allowed_group = orig_group
+
+    def test_15_auth_authorized_user_flow(self):
+        from auth_service import auth_service
+        from unittest.mock import patch
+
+        orig_disable = auth_service.disable_auth
+        orig_group = auth_service.allowed_group
+        try:
+            auth_service.disable_auth = False
+            auth_service.allowed_group = 'soundboard-authorized@example.com'
+
+            mock_user = {
+                'email': 'authorized-user@example.com',
+                'name': 'Test Engineer',
+                'uid': 'user-456'
+            }
+
+            with patch.object(auth_service, 'verify_token', return_value=mock_user):
+                with patch.object(auth_service, 'check_group_membership', return_value=True):
+                    # Check me endpoint
+                    me_res = self.client.get('/api/auth/me', headers={'Authorization': 'Bearer valid-token'})
+                    self.assertEqual(me_res.status_code, 200)
+                    self.assertEqual(me_res.get_json()['user']['email'], 'authorized-user@example.com')
+
+                    # Check protected data access
+                    sounds_res = self.client.get('/api/sounds', headers={'Authorization': 'Bearer valid-token'})
+                    self.assertEqual(sounds_res.status_code, 200)
+                    self.assertIn('sounds', sounds_res.get_json())
+        finally:
+            auth_service.disable_auth = orig_disable
+            auth_service.allowed_group = orig_group
+
 
 if __name__ == '__main__':
     unittest.main()
+
 
