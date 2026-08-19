@@ -16,7 +16,7 @@ env:
   GAR_LOCATION: 'us-west1'
   REPOSITORY: 'soundboard-app-adt'
   IMAGE_NAME: 'app'
-  WORKLOAD_IDENTITY_PROVIDER: 'projects/p-tf-state-mgmt/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+  WORKLOAD_IDENTITY_PROVIDER: 'projects/304516994920/locations/global/workloadIdentityPools/github-actions-pool'
   SERVICE_ACCOUNT: 'sa-gha-ar-pusher-adt@p-np-adt-de.iam.gserviceaccount.com'
 
 jobs:
