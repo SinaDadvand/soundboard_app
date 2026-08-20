@@ -41,6 +41,7 @@ class AuthService:
         )
         logger.info(f"[AuthService] Initialized with {len(self.allowed_users)} authorized email(s).")
 
+        self.allowed_group = None
         self._firebase_initialized = False
         self._init_firebase()
 

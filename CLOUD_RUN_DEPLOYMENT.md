@@ -76,26 +76,18 @@ gcloud run deploy soundboard-app-auth \
   --memory=512Mi \
   --cpu=1 \
   --allow-unauthenticated \
-  --set-env-vars="ALLOWED_USER_GROUP=soundboard-app-users-adt@yourdomain.com,FIREBASE_PROJECT_ID=p-np-adt-de"
+  --set-env-vars="ALLOWED_USERS=sina.dadvand@gmail.com,FIREBASE_PROJECT_ID=p-np-adt-de"
 ```
 
 ---
 
 ## 4. Terraform Infrastructure as Code
 
-When deploying via Terraform, reference the Artifact Registry container image directly:
+When deploying via Terraform, ensure **Public Access (`roles/run.invoker` for `allUsers`)** is enabled so the browser can load the web app and prompt for Google Sign-In:
 
 ```hcl
-resource "google_artifact_registry_repository" "soundboard_repo" {
-  location      = "us-west1"
-  repository_id = "soundboard-repo"
-  description   = "Docker repository for Soundboard App containers"
-  format        = "DOCKER"
-  project       = "p-np-adt-de"
-}
-
 resource "google_cloud_run_v2_service" "soundboard_auth" {
-  name     = "soundboard-app-auth"
+  name     = "soundboard-app-fb-adt"
   location = "us-west1"
   project  = "p-np-adt-de"
 
@@ -106,7 +98,7 @@ resource "google_cloud_run_v2_service" "soundboard_auth" {
     }
 
     containers {
-      image = "us-west1-docker.pkg.dev/p-np-adt-de/soundboard-repo/soundboard-app-auth:latest"
+      image = "us-west1-docker.pkg.dev/p-np-adt-de/soundboard-app-adt/app:latest"
 
       resources {
         limits = {
@@ -117,18 +109,13 @@ resource "google_cloud_run_v2_service" "soundboard_auth" {
       }
 
       env {
-        name  = "ALLOWED_USER_GROUP"
-        value = "soundboard-app-users-adt@yourdomain.com"
+        name  = "ALLOWED_USERS"
+        value = "sina.dadvand@gmail.com"
       }
 
       env {
         name  = "FIREBASE_PROJECT_ID"
         value = "p-np-adt-de"
-      }
-
-      env {
-        name  = "DISCORD_BOT_TOKEN"
-        value = var.discord_bot_token
       }
 
       ports {
@@ -138,6 +125,7 @@ resource "google_cloud_run_v2_service" "soundboard_auth" {
   }
 }
 
+# CRITICAL: Grant allUsers invoker permissions so users can reach the frontend login page
 resource "google_cloud_run_service_iam_member" "public_access" {
   location = google_cloud_run_v2_service.soundboard_auth.location
   project  = google_cloud_run_v2_service.soundboard_auth.project

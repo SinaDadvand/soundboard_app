@@ -462,8 +462,8 @@ def initialize_app():
     discord_service.start()
     print(f"Loaded {len(config_manager.config.get('sounds', []))} sounds into 3 Numpad Groups.")
     print(f"Panic Key: [{config_manager.config.get('panic_key', 'esc').upper()}]")
-    if auth_service.allowed_group:
-        print(f"🔒 Access Control Group: {auth_service.allowed_group}")
+    if auth_service.allowed_users:
+        print(f"🔒 Access Control Allowlist ({len(auth_service.allowed_users)} users): {', '.join(sorted(auth_service.allowed_users))}")
     elif auth_service.disable_auth:
         print("🔓 Auth Mode: DISABLED (Local Development)")
     else:
