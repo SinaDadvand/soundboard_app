@@ -85,8 +85,15 @@ class AuthService:
 
     def get_client_config(self):
         """Return public Firebase configuration for client-side Web SDK."""
+        api_key = (
+            os.environ.get('FIREBASE_API_KEY') or 
+            os.environ.get('FIREBASE_WEB_API_KEY') or 
+            os.environ.get('GOOGLE_API_KEY') or 
+            os.environ.get('GCP_API_KEY') or 
+            ''
+        )
         return {
-            'apiKey': os.environ.get('FIREBASE_API_KEY', ''),
+            'apiKey': api_key,
             'authDomain': os.environ.get('FIREBASE_AUTH_DOMAIN', f"{self.project_id}.firebaseapp.com" if self.project_id else ''),
             'projectId': self.project_id or '',
             'storageBucket': os.environ.get('FIREBASE_STORAGE_BUCKET', f"{self.project_id}.appspot.com" if self.project_id else ''),

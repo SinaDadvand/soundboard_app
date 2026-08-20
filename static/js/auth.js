@@ -63,16 +63,27 @@
             const res = await fetch('/api/auth/config');
             authConfig = await res.json();
 
-            if (!authConfig.authEnabled || !authConfig.apiKey) {
-                console.log('[Auth] Auth is disabled or unconfigured in this environment. Bypassing client login.');
+            if (!authConfig.authEnabled) {
+                console.log('[Auth] Auth is disabled in this environment. Bypassing client login.');
                 if (authContainer) authContainer.classList.add('hidden');
                 if (authBarrierModal) authBarrierModal.classList.add('hidden');
                 window.dispatchEvent(new CustomEvent('auth-state-ready', { detail: { authorized: true, user: null } }));
                 return;
             }
 
+            if (!authConfig.apiKey) {
+                console.error('[Auth] FIREBASE_API_KEY environment variable is not configured on the server.');
+                showBarrierModal();
+                const subtitle = document.querySelector('#auth-barrier-modal p');
+                if (subtitle) {
+                    subtitle.innerHTML = '<span class="text-amber-400 font-semibold">Configuration Notice:</span> FIREBASE_API_KEY environment variable is not configured in Cloud Run. Please add FIREBASE_API_KEY to your Cloud Run service settings.';
+                }
+                return;
+            }
+
             if (typeof firebase === 'undefined') {
                 console.error('[Auth] Firebase Web SDK script not loaded.');
+                alert('Firebase SDK failed to load. Please check your network connection.');
                 return;
             }
 
@@ -143,7 +154,11 @@
 
     async function signInWithGoogle() {
         if (!isAuthInitialized) {
-            console.warn('[Auth] Firebase not yet initialized.');
+            if (!authConfig || !authConfig.apiKey) {
+                alert("⚠️ Firebase Web API Key Missing:\n\nPlease add the environment variable FIREBASE_API_KEY to your Google Cloud Run service (or Terraform config) with your Firebase/GCP Web API Key.");
+            } else {
+                alert("Firebase Authentication is still initializing. Please wait a moment and try again.");
+            }
             return;
         }
 
