@@ -1,10 +1,10 @@
 {
   "version": "2.0",
   "master_volume": 0.9,
-  "global_pitch": 4.0,
-  "global_speed": 1.25,
-  "global_echo": 0.5,
-  "global_reverb": 0.6,
+  "global_pitch": 0.0,
+  "global_speed": 1.0,
+  "global_echo": 0.0,
+  "global_reverb": 0.0,
   "panic_key": "esc",
   "primary_device": null,
   "secondary_device": "CABLE Input (VB-Audio Virtual Cable)",
@@ -13,9 +13,9 @@
   "cable_enabled": false,
   "sounds": [
     {
-      "id": "c4a8e2c2",
-      "filename": "test_replacement.mp3",
-      "name": "Test Replacement Sound",
+      "id": "6d016e7e",
+      "filename": "a-great-success.mp3",
+      "name": "a-great-success",
       "hotkey": "ctrl+7",
       "symbol": "7",
       "modifier": "ctrl",

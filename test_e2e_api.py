@@ -18,6 +18,27 @@ class TestSoundboardE2E(unittest.TestCase):
         from auth_service import auth_service
         auth_service.disable_auth = True
 
+    @classmethod
+    def tearDownClass(cls):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        test_file = os.path.join(base_dir, 'static', 'audio', 'test_replacement.mp3')
+        if os.path.exists(test_file):
+            try:
+                os.remove(test_file)
+            except Exception:
+                pass
+        config_manager.sync_audio_files(config_manager.config)
+        config_manager.config['master_volume'] = 0.9
+        config_manager.config['global_pitch'] = 0.0
+        config_manager.config['global_speed'] = 1.0
+        config_manager.config['global_echo'] = 0.0
+        config_manager.config['global_reverb'] = 0.0
+        for s in config_manager.config.get('sounds', []):
+            s['volume'] = 1.0
+            s['pitch'] = 0.0
+            s['speed'] = 1.0
+        config_manager.save_config()
+
     def test_01_index_page(self):
         res = self.client.get('/')
         self.assertEqual(res.status_code, 200)
@@ -136,6 +157,15 @@ class TestSoundboardE2E(unittest.TestCase):
         s_data = status_res.get_json()
         self.assertEqual(s_data['global_pitch'], 4.0)
         self.assertEqual(s_data['global_echo'], 0.5)
+
+        # Restore default zero FX
+        self.client.post('/api/global_fx', json={
+            'pitch': 0.0,
+            'speed': 1.0,
+            'echo': 0.0,
+            'reverb': 0.0
+        })
+        self.client.post('/api/master_volume', json={'volume': 0.9})
 
     def test_10_upload_and_replace_hotkey(self):
         import io

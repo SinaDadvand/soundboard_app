@@ -81,9 +81,15 @@ audio_engine.set_devices(
 
 @app.after_request
 def after_request(response):
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    # Allow favicons and static icons to be cached by browsers and bookmark toolbars
+    if request.path.startswith('/favicon') or request.path.startswith('/apple-touch-icon') or request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=604800'
+        response.headers.pop('Pragma', None)
+        response.headers.pop('Expires', None)
+    else:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
     return response
 
 
