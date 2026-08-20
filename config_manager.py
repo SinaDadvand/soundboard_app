@@ -42,12 +42,18 @@ class ConfigManager:
 
     def get_default_config(self):
         return {
-            "version": "2.1",
-            "master_volume": 1.0,
+            "version": "2.2",
+            "master_volume": 0.9,
+            "global_pitch": 0.0,
+            "global_speed": 1.0,
+            "global_echo": 0.0,
+            "global_reverb": 0.0,
             "panic_key": "esc",
             "primary_device": None,
             "secondary_device": None,
-            "secondary_enabled": False,
+            "secondary_enabled": True,
+            "headset_enabled": True,
+            "cable_enabled": True,
             "sounds": []
         }
 

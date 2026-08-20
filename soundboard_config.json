@@ -1,15 +1,21 @@
 {
   "version": "2.0",
   "master_volume": 0.9,
+  "global_pitch": 0.0,
+  "global_speed": 1.0,
+  "global_echo": 0.0,
+  "global_reverb": 0.0,
   "panic_key": "esc",
   "primary_device": null,
   "secondary_device": "CABLE Input (VB-Audio Virtual Cable)",
   "secondary_enabled": false,
+  "headset_enabled": true,
+  "cable_enabled": false,
   "sounds": [
     {
-      "id": "7f9bcd70",
-      "filename": "test_replacement.mp3",
-      "name": "Test Replacement Sound",
+      "id": "c4a8e2c2",
+      "filename": "a-great-success.mp3",
+      "name": "a-great-success",
       "hotkey": "ctrl+7",
       "symbol": "7",
       "modifier": "ctrl",
@@ -19,22 +25,21 @@
       "order": 0
     },
     {
-      "id": "0fad7ef9",
-      "filename": "All Day.mp3",
-      "name": "All Day",
-      "category": "All",
+      "id": "6058a465",
+      "filename": "aerobic-meltdown (mp3cut.net).mp3",
+      "name": "aerobic-meltdown (mp3cut.net)",
       "hotkey": "ctrl+8",
+      "symbol": "8",
+      "modifier": "ctrl",
       "volume": 1.0,
       "speed": 1.0,
       "pitch": 0.0,
-      "order": 1,
-      "symbol": "8",
-      "modifier": "ctrl"
+      "order": 1
     },
     {
-      "id": "f9cc34e9",
-      "filename": "Choppa!.mp3",
-      "name": "Choppa!",
+      "id": "0fad7ef9",
+      "filename": "All Day.mp3",
+      "name": "All Day",
       "category": "All",
       "hotkey": "ctrl+9",
       "volume": 1.0,
@@ -45,9 +50,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "47e94523",
-      "filename": "Damn Son!.mp3",
-      "name": "Damn Son!",
+      "id": "f9cc34e9",
+      "filename": "Choppa!.mp3",
+      "name": "Choppa!",
       "category": "All",
       "hotkey": "ctrl+4",
       "volume": 1.0,
@@ -58,9 +63,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "f7cc34b4",
-      "filename": "Faaah.mp3",
-      "name": "Faaah",
+      "id": "47e94523",
+      "filename": "Damn Son!.mp3",
+      "name": "Damn Son!",
       "category": "All",
       "hotkey": "ctrl+5",
       "volume": 1.0,
@@ -71,9 +76,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "44b4d199",
-      "filename": "For the Love of God!.mp3",
-      "name": "For the Love of God!",
+      "id": "f7cc34b4",
+      "filename": "Faaah.mp3",
+      "name": "Faaah",
       "category": "All",
       "hotkey": "ctrl+6",
       "volume": 1.0,
@@ -84,9 +89,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "f275b353",
-      "filename": "Game Over Man!.mp3",
-      "name": "Game Over Man!",
+      "id": "44b4d199",
+      "filename": "For the Love of God!.mp3",
+      "name": "For the Love of God!",
       "category": "All",
       "hotkey": "ctrl+1",
       "volume": 1.0,
@@ -97,9 +102,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "a83bb40d",
-      "filename": "GodDamn NubNub.mp3",
-      "name": "GodDamn NubNub",
+      "id": "f275b353",
+      "filename": "Game Over Man!.mp3",
+      "name": "Game Over Man!",
       "category": "All",
       "hotkey": "ctrl+2",
       "volume": 1.0,
@@ -110,9 +115,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "8350b3f4",
-      "filename": "goddamn.mp3",
-      "name": "goddamn",
+      "id": "a83bb40d",
+      "filename": "GodDamn NubNub.mp3",
+      "name": "GodDamn NubNub",
       "category": "All",
       "hotkey": "ctrl+3",
       "volume": 1.0,
@@ -123,9 +128,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "05566af8",
-      "filename": "Hotpocket.mp3",
-      "name": "Hotpocket",
+      "id": "8350b3f4",
+      "filename": "goddamn.mp3",
+      "name": "goddamn",
       "category": "All",
       "hotkey": "ctrl+0",
       "volume": 1.0,
@@ -136,9 +141,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "264ceb59",
-      "filename": "i-got-this-fahhhhhh.mp3",
-      "name": "i-got-this-fahhhhhh",
+      "id": "05566af8",
+      "filename": "Hotpocket.mp3",
+      "name": "Hotpocket",
       "category": "All",
       "hotkey": "ctrl+.",
       "volume": 1.0,
@@ -149,9 +154,9 @@
       "modifier": "ctrl"
     },
     {
-      "id": "ef8f3dd1",
-      "filename": "ITYSL didn't do shit.mp3",
-      "name": "ITYSL didn't do shit",
+      "id": "264ceb59",
+      "filename": "i-got-this-fahhhhhh.mp3",
+      "name": "i-got-this-fahhhhhh",
       "category": "All",
       "hotkey": "alt+7",
       "volume": 1.0,
@@ -162,9 +167,9 @@
       "modifier": "alt"
     },
     {
-      "id": "9d208c5b",
-      "filename": "ITYSL Not Worry About it.mp3",
-      "name": "ITYSL Not Worry About it",
+      "id": "ef8f3dd1",
+      "filename": "ITYSL didn't do shit.mp3",
+      "name": "ITYSL didn't do shit",
       "category": "All",
       "hotkey": "alt+8",
       "volume": 1.0,
@@ -442,12 +447,6 @@
     "Quotes",
     "Favorites"
   ],
-  "headset_enabled": true,
-  "cable_enabled": false,
-  "global_pitch": 4.0,
-  "global_speed": 1.25,
-  "global_echo": 0.5,
-  "global_reverb": 0.6,
   "discord_token": null,
   "discord_guild_id": "1234567890",
   "discord_channel_id": "9876543210"

@@ -105,6 +105,12 @@ def serve_audio(filename):
     return send_from_directory(AUDIO_FOLDER, filename)
 
 
+@app.route('/favicon.ico')
+@app.route('/favicon.svg')
+def serve_favicon():
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'favicon.svg', mimetype='image/svg+xml')
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Authentication & Authorization Endpoints
 # ─────────────────────────────────────────────────────────────────────────────

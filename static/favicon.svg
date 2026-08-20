@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d4af37"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background with Gradient Border -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#111520" stroke="url(#borderGrad)" stroke-width="3"/>
+
+  <!-- Music Note Icon with Cyan Glow -->
+  <g filter="url(#glow)">
+    <path d="M25 45V18l18-4v27M25 45a5 5 0 1 1-10 0 5 5 0 0 1 10 0zm18-4a5 5 0 1 1-10 0 5 5 0 0 1 10 0zM25 26l18-4" 
+          fill="none" 
+          stroke="#22d3ee" 
+          stroke-width="3.5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+  </g>
+</svg>

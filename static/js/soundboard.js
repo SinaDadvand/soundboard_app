@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State
     let sounds = [];
-    let masterVolume = 1.0;
+    let masterVolume = 0.9;
     let globalPitch = 0;       // -12 to +12 semitones
     let globalSpeed = 1.0;      // 0.5 to 2.0x
     let globalEcho = 0.0;       // 0.0 to 1.0 (0% to 100%)
