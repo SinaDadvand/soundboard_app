@@ -71,7 +71,11 @@
                 return;
             }
 
-            if (!authConfig.apiKey) {
+            const apiKey = authConfig.apiKey || (typeof window !== 'undefined' && window.ENV && window.ENV.FIREBASE_API_KEY) || '';
+            const authDomain = authConfig.authDomain || (typeof window !== 'undefined' && window.ENV && window.ENV.FIREBASE_AUTH_DOMAIN) || 'p-np-adt-de.firebaseapp.com';
+            const projectId = authConfig.projectId || (typeof window !== 'undefined' && window.ENV && window.ENV.FIREBASE_PROJECT_ID) || 'p-np-adt-de';
+
+            if (!apiKey) {
                 console.error('[Auth] FIREBASE_API_KEY environment variable is not configured on the server.');
                 showBarrierModal();
                 const subtitle = document.querySelector('#auth-barrier-modal p');
@@ -87,8 +91,15 @@
                 return;
             }
 
+            const firebaseConfig = {
+                apiKey: apiKey,
+                authDomain: authDomain,
+                projectId: projectId,
+                storageBucket: authConfig.storageBucket || `${projectId}.appspot.com`
+            };
+
             if (!firebase.apps.length) {
-                firebase.initializeApp(authConfig);
+                firebase.initializeApp(firebaseConfig);
             }
 
             firebase.auth().onAuthStateChanged(handleAuthStateChanged);
@@ -154,12 +165,26 @@
 
     async function signInWithGoogle() {
         if (!isAuthInitialized) {
-            if (!authConfig || !authConfig.apiKey) {
-                alert("⚠️ Firebase Web API Key Missing:\n\nPlease add the environment variable FIREBASE_API_KEY to your Google Cloud Run service (or Terraform config) with your Firebase/GCP Web API Key.");
-            } else {
-                alert("Firebase Authentication is still initializing. Please wait a moment and try again.");
+            // Attempt on-demand initialization if apiKey is present
+            if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+                const apiKey = (authConfig && authConfig.apiKey) || (typeof window !== 'undefined' && window.ENV && window.ENV.FIREBASE_API_KEY) || '';
+                const authDomain = (authConfig && authConfig.authDomain) || (typeof window !== 'undefined' && window.ENV && window.ENV.FIREBASE_AUTH_DOMAIN) || 'p-np-adt-de.firebaseapp.com';
+                const projectId = (authConfig && authConfig.projectId) || (typeof window !== 'undefined' && window.ENV && window.ENV.FIREBASE_PROJECT_ID) || 'p-np-adt-de';
+                if (apiKey) {
+                    firebase.initializeApp({
+                        apiKey: apiKey,
+                        authDomain: authDomain,
+                        projectId: projectId
+                    });
+                    firebase.auth().onAuthStateChanged(handleAuthStateChanged);
+                    isAuthInitialized = true;
+                }
             }
-            return;
+
+            if (!isAuthInitialized) {
+                alert("⚠️ Firebase Web API Key Missing:\n\nPlease add the environment variable FIREBASE_API_KEY to your Google Cloud Run service with your Firebase Web API Key.");
+                return;
+            }
         }
 
         const provider = new firebase.auth.GoogleAuthProvider();

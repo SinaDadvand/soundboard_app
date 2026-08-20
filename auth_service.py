@@ -92,11 +92,25 @@ class AuthService:
             os.environ.get('GCP_API_KEY') or 
             ''
         )
+        project_id = (
+            self.project_id or 
+            os.environ.get('GCP_PROJECT') or 
+            os.environ.get('GOOGLE_CLOUD_PROJECT') or 
+            'p-np-adt-de'
+        )
+        auth_domain = (
+            os.environ.get('FIREBASE_AUTH_DOMAIN') or 
+            f"{project_id}.firebaseapp.com"
+        )
+        storage_bucket = (
+            os.environ.get('FIREBASE_STORAGE_BUCKET') or 
+            f"{project_id}.appspot.com"
+        )
         return {
             'apiKey': api_key,
-            'authDomain': os.environ.get('FIREBASE_AUTH_DOMAIN', f"{self.project_id}.firebaseapp.com" if self.project_id else ''),
-            'projectId': self.project_id or '',
-            'storageBucket': os.environ.get('FIREBASE_STORAGE_BUCKET', f"{self.project_id}.appspot.com" if self.project_id else ''),
+            'authDomain': auth_domain,
+            'projectId': project_id,
+            'storageBucket': storage_bucket,
             'messagingSenderId': os.environ.get('FIREBASE_MESSAGING_SENDER_ID', ''),
             'appId': os.environ.get('FIREBASE_APP_ID', ''),
             'authEnabled': not self.disable_auth
