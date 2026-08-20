@@ -106,9 +106,24 @@ def serve_audio(filename):
 
 
 @app.route('/favicon.ico')
+def serve_favicon_ico():
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'favicon.ico', mimetype='image/x-icon')
+
+
+@app.route('/favicon.png')
+def serve_favicon_png():
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'favicon.png', mimetype='image/png')
+
+
 @app.route('/favicon.svg')
-def serve_favicon():
+def serve_favicon_svg():
     return send_from_directory(os.path.join(BASE_DIR, 'static'), 'favicon.svg', mimetype='image/svg+xml')
+
+
+@app.route('/apple-touch-icon.png')
+@app.route('/apple-touch-icon-precomposed.png')
+def serve_apple_touch_icon():
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'apple-touch-icon.png', mimetype='image/png')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
