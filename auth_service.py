@@ -134,6 +134,17 @@ def require_auth(f):
             }
             return f(*args, **kwargs)
 
+        # Check for Desktop Hotkey Companion authentication
+        companion_key = request.headers.get('X-Companion-Key') or request.args.get('companion_key')
+        expected_companion_key = os.environ.get('COMPANION_API_KEY', 'soundboard-companion-key-2026')
+        if companion_key and companion_key == expected_companion_key:
+            g.current_user = {
+                'uid': 'desktop-companion-user',
+                'email': 'companion@desktop.local',
+                'name': 'Desktop Hotkey Companion'
+            }
+            return f(*args, **kwargs)
+
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
             return jsonify({

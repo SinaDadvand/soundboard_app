@@ -272,6 +272,22 @@ class TestSoundboardE2E(unittest.TestCase):
             auth_service.disable_auth = orig_disable
             auth_service.allowed_users = orig_users
 
+    def test_16_companion_auth_and_events(self):
+        from auth_service import auth_service
+        orig_disable = auth_service.disable_auth
+        try:
+            auth_service.disable_auth = False
+            # Test access via X-Companion-Key
+            res = self.client.get('/api/sounds', headers={'X-Companion-Key': 'soundboard-companion-key-2026'})
+            self.assertEqual(res.status_code, 200)
+            self.assertIn('sounds', res.get_json())
+
+            # Test panic with companion key
+            panic_res = self.client.post('/api/panic', headers={'X-Companion-Key': 'soundboard-companion-key-2026'})
+            self.assertEqual(panic_res.status_code, 200)
+        finally:
+            auth_service.disable_auth = orig_disable
+
 
 if __name__ == '__main__':
     unittest.main()
