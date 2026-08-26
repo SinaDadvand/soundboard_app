@@ -12,7 +12,10 @@ Flask server providing REST APIs and modern UI for:
 import sys
 import os
 import time
-from flask import Flask, render_template, send_from_directory, jsonify, request, g
+import json
+import queue
+import threading
+from flask import Flask, render_template, send_from_directory, jsonify, request, g, Response
 from werkzeug.utils import secure_filename
 
 from audio_engine import AudioEngine
@@ -22,6 +25,24 @@ from discord_service import DiscordService
 from auth_service import auth_service, require_auth
 
 app = Flask(__name__)
+
+# Real-Time Event Subscribers (Server-Sent Events)
+_sse_subscribers = []
+_sse_lock = threading.Lock()
+
+
+def broadcast_sse(event_type: str, data: dict = None):
+    """Broadcast an event payload to all connected SSE clients."""
+    payload = {'type': event_type, 'timestamp': time.time()}
+    if data:
+        payload.update(data)
+    with _sse_lock:
+        for q in list(_sse_subscribers):
+            try:
+                q.put_nowait(payload)
+            except Exception:
+                pass
+
 
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max upload
@@ -388,6 +409,15 @@ def api_play_sound(sound_id):
     )
 
     if success:
+        # Broadcast real-time play event to connected browser web clients
+        broadcast_sse('play', {
+            'sound_id': sound['id'],
+            'filename': sound['filename'],
+            'name': sound['name'],
+            'volume': volume,
+            'speed': speed,
+            'pitch': pitch
+        })
         return jsonify({
             'status': 'success',
             'sound_id': sound['id'],
@@ -400,10 +430,46 @@ def api_play_sound(sound_id):
 
 
 @app.route('/api/stop', methods=['POST', 'GET'])
+@app.route('/api/panic', methods=['POST', 'GET'])
 @require_auth
 def api_stop_all():
     audio_engine.stop_all()
+    broadcast_sse('stop')
     return jsonify({'status': 'success', 'message': 'Stopped all playback'})
+
+
+@app.route('/api/events', methods=['GET'])
+def api_events():
+    """Server-Sent Events endpoint for real-time soundboard state sync."""
+    def event_stream():
+        q = queue.Queue(maxsize=100)
+        with _sse_lock:
+            _sse_subscribers.append(q)
+        try:
+            yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+            while True:
+                try:
+                    event_data = q.get(timeout=25)
+                    yield f"data: {json.dumps(event_data)}\n\n"
+                except queue.Empty:
+                    # Heartbeat comment
+                    yield f": keepalive\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            with _sse_lock:
+                if q in _sse_subscribers:
+                    _sse_subscribers.remove(q)
+
+    return Response(
+        event_stream(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
 
 
 @app.route('/api/sounds/<sound_id>/stop', methods=['POST'])

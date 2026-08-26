@@ -25,11 +25,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let globalEcho = 0.0;       // 0.0 to 1.0 (0% to 100%)
     let globalReverb = 0.0;     // 0.0 to 1.0 (0% to 100%)
     let panicKey = 'esc';
-    let headsetEnabled = true;
+    let headsetEnabled = localStorage.getItem('soundboard_headset_enabled') === 'true'; // Default offline (false)
     let cableEnabled = true;
     let isRebinding = false;
     let rebindingSoundId = null;
     let activePlayingIds = new Set();
+    const clientId = 'client_' + Math.random().toString(36).substring(2, 9);
+    const activeLocalAudios = new Set();
 
     // DOM Grids
     const gridCtrl = document.getElementById('grid-ctrl');
@@ -115,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupEventListeners();
         setupKnobs();
         setupDestinationToggles();
+        initSSE();
     }
 
     async function loadSounds() {
@@ -395,12 +398,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Local Browser Audio & Real-time SSE Sync
+    // ─────────────────────────────────────────────────────────────────────────
+    function playLocalSound(sound, overrides = {}) {
+        if (!headsetEnabled) return;
+        try {
+            const filename = overrides.filename || sound.filename;
+            if (!filename) return;
+
+            const audioUrl = `/audio/${encodeURIComponent(filename)}`;
+            const audio = new Audio(audioUrl);
+
+            const sVol = overrides.volume !== undefined ? overrides.volume : (sound.volume !== undefined ? sound.volume : 1.0);
+            audio.volume = Math.max(0.0, Math.min(1.0, sVol * masterVolume));
+
+            const sSpeed = overrides.speed !== undefined ? overrides.speed : (sound.speed !== undefined ? sound.speed : 1.0);
+            audio.playbackRate = Math.max(0.5, Math.min(2.0, sSpeed * globalSpeed));
+
+            activeLocalAudios.add(audio);
+            audio.addEventListener('ended', () => activeLocalAudios.delete(audio));
+            audio.addEventListener('error', () => activeLocalAudios.delete(audio));
+
+            audio.play().catch(e => {
+                console.warn('Local browser audio play prevented by autoplay policy:', e);
+            });
+        } catch (err) {
+            console.error('Error playing local audio:', err);
+        }
+    }
+
+    function stopAllLocalAudio() {
+        activeLocalAudios.forEach(audio => {
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (e) {}
+        });
+        activeLocalAudios.clear();
+    }
+
+    function initSSE() {
+        try {
+            const eventSource = new EventSource('/api/events');
+            eventSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'play') {
+                        setCardPlayingVisual(data.sound_id, true);
+                        setTimeout(() => setCardPlayingVisual(data.sound_id, false), 1800);
+
+                        // If triggered from outside this browser tab (e.g. desktop companion hotkey), play locally if headset is on
+                        if (data.client_id !== clientId) {
+                            const targetSound = sounds.find(s => s.id === data.sound_id) || data;
+                            playLocalSound(targetSound, data);
+                        }
+                    } else if (data.type === 'stop' || data.type === 'panic') {
+                        stopAllLocalAudio();
+                        activePlayingIds.clear();
+                        document.querySelectorAll('.numpad-key.playing').forEach(el => el.classList.remove('playing'));
+                    }
+                } catch (err) {}
+            };
+        } catch (err) {
+            console.warn('SSE not supported or connection error:', err);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Destination Toggles (Headset & Virtual Cable)
     // ─────────────────────────────────────────────────────────────────────────
     function setupDestinationToggles() {
+        updateHeadsetButtonUI();
+
         toggleHeadsetBtn.addEventListener('click', async () => {
             headsetEnabled = !headsetEnabled;
-            toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+            localStorage.setItem('soundboard_headset_enabled', headsetEnabled ? 'true' : 'false');
+            updateHeadsetButtonUI();
             await syncDestinationToggles();
         });
 
@@ -409,6 +482,15 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleCableBtn.classList.toggle('active', cableEnabled);
             await syncDestinationToggles();
         });
+    }
+
+    function updateHeadsetButtonUI() {
+        if (!toggleHeadsetBtn) return;
+        toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+        const label = document.getElementById('headset-btn-label') || toggleHeadsetBtn.querySelector('span:not(.dest-led)');
+        if (label) {
+            label.textContent = headsetEnabled ? '🎧 Headset (Live)' : '🎧 Headset (Off)';
+        }
     }
 
     async function syncDestinationToggles() {
@@ -425,7 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'success') {
                 headsetEnabled = Boolean(data.headset_enabled);
                 cableEnabled = Boolean(data.cable_enabled);
-                toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+                updateHeadsetButtonUI();
                 toggleCableBtn.classList.toggle('active', cableEnabled);
             }
         } catch (err) {
@@ -443,6 +525,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setCardPlayingVisual(sound.id, true);
 
+        // Play locally through browser headphones if enabled
+        playLocalSound(sound, {
+            volume: soundVol,
+            speed: soundSpeed,
+            pitch: soundPitch
+        });
+
         try {
             await apiFetch(`/api/play/${sound.id}`, {
                 method: 'POST',
@@ -450,7 +539,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     volume: soundVol,
                     pitch: soundPitch,
-                    speed: soundSpeed
+                    speed: soundSpeed,
+                    client_id: clientId
                 })
             });
         } catch (err) {
@@ -507,6 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function panicStopAll() {
+        stopAllLocalAudio();
         activePlayingIds.clear();
         document.querySelectorAll('.numpad-key').forEach(c => {
             c.classList.remove('playing');
@@ -522,7 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            await apiFetch('/api/stop', { method: 'POST' });
+            await apiFetch('/api/panic', { method: 'POST' });
         } catch (err) {
             console.error('Panic stop error:', err);
         }
