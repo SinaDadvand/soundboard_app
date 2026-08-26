@@ -21,11 +21,11 @@ A high-performance standalone soundboard and web interface with real-time DSP ef
 ## Running the Application
 
 ### Option 1: Standalone Executable (Recommended)
-Double-click `dist\VirtualSoundboard2.exe` or run `launch-v2.bat`.
+Double-click `dist\VirtualSoundboard2.exe` or `scripts\launch-v2.bat`.
 
 To create a desktop shortcut, run:
 ```powershell
-powershell -ExecutionPolicy Bypass -File create-desktop-shortcut.ps1
+powershell -ExecutionPolicy Bypass -File scripts\create-desktop-shortcut.ps1
 ```
 
 ### Option 2: Python Development Mode
@@ -39,6 +39,28 @@ python launcher.py
 ---
 
 ## Building Standalone Executable
+Double-click `build-executable.bat` or run:
 ```powershell
 python -m PyInstaller VirtualSoundboard2.spec --clean --noconfirm
+```
+
+---
+
+## Project Structure
+```text
+soundboard_app/
+├── app.py                  # Web server & Cloud Run entrypoint
+├── launcher.py             # Desktop GUI launcher & hotkey companion
+├── build-executable.bat    # 1-Click desktop executable builder
+├── Dockerfile              # Production container definition
+├── requirements.txt        # Dependencies
+├── soundboard_config.json  # Audio sound mappings & defaults
+├── VirtualSoundboard2.spec # PyInstaller build spec
+├── src/                    # Backend modules (audio_engine, auth, config, discord, hotkeys)
+├── tests/                  # Unit and E2E automated test suites
+├── docs/                   # Deployment & setup documentation
+├── scripts/                # Deployment and launch utility scripts
+├── assets/                 # App icons
+├── static/                 # Audio files, CSS, JavaScript, favicons
+└── templates/              # HTML frontend
 ```

@@ -18,11 +18,17 @@ import threading
 from flask import Flask, render_template, send_from_directory, jsonify, request, g, Response
 from werkzeug.utils import secure_filename
 
-from audio_engine import AudioEngine
-from config_manager import ConfigManager
-from hotkey_manager import HotkeyManager
-from discord_service import DiscordService
-from auth_service import auth_service, require_auth
+# Add 'src' directory to Python module search path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR = os.path.join(BASE_DIR, 'src')
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+from src.audio_engine import AudioEngine
+from src.config_manager import ConfigManager
+from src.hotkey_manager import HotkeyManager
+from src.discord_service import DiscordService
+from src.auth_service import auth_service, require_auth
 
 app = Flask(__name__)
 
