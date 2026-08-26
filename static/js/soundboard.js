@@ -9,19 +9,29 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Helper to route all API calls with Firebase Authorization Bearer Token
+    const apiFetch = (url, options) => {
+        if (window.authenticatedFetch) {
+            return window.authenticatedFetch(url, options);
+        }
+        return fetch(url, options);
+    };
+
     // State
     let sounds = [];
-    let masterVolume = 1.0;
+    let masterVolume = 0.9;
     let globalPitch = 0;       // -12 to +12 semitones
     let globalSpeed = 1.0;      // 0.5 to 2.0x
     let globalEcho = 0.0;       // 0.0 to 1.0 (0% to 100%)
     let globalReverb = 0.0;     // 0.0 to 1.0 (0% to 100%)
     let panicKey = 'esc';
-    let headsetEnabled = true;
+    let headsetEnabled = localStorage.getItem('soundboard_headset_enabled') === 'true'; // Default offline (false)
     let cableEnabled = true;
     let isRebinding = false;
     let rebindingSoundId = null;
     let activePlayingIds = new Set();
+    const clientId = 'client_' + Math.random().toString(36).substring(2, 9);
+    const activeLocalAudios = new Set();
 
     // DOM Grids
     const gridCtrl = document.getElementById('grid-ctrl');
@@ -32,6 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Destination Toggles
     const toggleHeadsetBtn = document.getElementById('toggle-headset-btn');
     const toggleCableBtn = document.getElementById('toggle-cable-btn');
+    const toggleDiscordBtn = document.getElementById('toggle-discord-btn');
+    const discordBtnLabel = document.getElementById('discord-btn-label');
+    const discordModalStatusBadge = document.getElementById('discord-modal-status-badge');
+    const discordTokenInput = document.getElementById('discord-token-input');
+    const saveDiscordTokenBtn = document.getElementById('save-discord-token-btn');
+    const discordChannelSelect = document.getElementById('discord-channel-select');
+    const discordJoinBtn = document.getElementById('discord-join-btn');
 
     // 5 Hardware Knobs Elements
     const volumeKnob = document.getElementById('volume-knob');
@@ -100,11 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
         setupEventListeners();
         setupKnobs();
         setupDestinationToggles();
+        initSSE();
     }
 
     async function loadSounds() {
         try {
-            const res = await fetch('/api/status');
+            const res = await apiFetch('/api/status');
             const statusData = await res.json();
             
             masterVolume = statusData.master_volume !== undefined ? statusData.master_volume : 1.0;
@@ -123,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             panicKeyBadge.textContent = panicKey.toUpperCase();
             panicKeyInput.value = panicKey;
 
-            const sRes = await fetch('/api/sounds');
+            const sRes = await apiFetch('/api/sounds');
             const sData = await sRes.json();
             sounds = sData.sounds || [];
 
@@ -135,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadDevices() {
         try {
-            const res = await fetch('/api/devices');
+            const res = await apiFetch('/api/devices');
             const data = await res.json();
             
             if (data.headset_enabled !== undefined) {
@@ -309,14 +327,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const speedVal = card.querySelector('.speed-val');
         const resetSpeedBtn = card.querySelector('.reset-speed-btn');
 
-        // Play / Stop
+        // Play (Multi-instance polyphonic)
         playBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (activePlayingIds.has(sound.id)) {
-                stopSound(sound.id);
-            } else {
-                playFromBrowser(sound);
-            }
+            playFromBrowser(sound);
+        });
+
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('input') || e.target.closest('button')) return;
+            playFromBrowser(sound);
         });
 
         // Rebind Hotkey
@@ -379,12 +398,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Local Browser Audio & Real-time SSE Sync
+    // ─────────────────────────────────────────────────────────────────────────
+    function playLocalSound(sound, overrides = {}) {
+        if (!headsetEnabled) return;
+        try {
+            const filename = overrides.filename || sound.filename;
+            if (!filename) return;
+
+            const audioUrl = `/audio/${encodeURIComponent(filename)}`;
+            const audio = new Audio(audioUrl);
+
+            const sVol = overrides.volume !== undefined ? overrides.volume : (sound.volume !== undefined ? sound.volume : 1.0);
+            audio.volume = Math.max(0.0, Math.min(1.0, sVol * masterVolume));
+
+            const sSpeed = overrides.speed !== undefined ? overrides.speed : (sound.speed !== undefined ? sound.speed : 1.0);
+            audio.playbackRate = Math.max(0.5, Math.min(2.0, sSpeed * globalSpeed));
+
+            activeLocalAudios.add(audio);
+            audio.addEventListener('ended', () => activeLocalAudios.delete(audio));
+            audio.addEventListener('error', () => activeLocalAudios.delete(audio));
+
+            audio.play().catch(e => {
+                console.warn('Local browser audio play prevented by autoplay policy:', e);
+            });
+        } catch (err) {
+            console.error('Error playing local audio:', err);
+        }
+    }
+
+    function stopAllLocalAudio() {
+        activeLocalAudios.forEach(audio => {
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (e) {}
+        });
+        activeLocalAudios.clear();
+    }
+
+    function initSSE() {
+        try {
+            const eventSource = new EventSource('/api/events');
+            eventSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'play') {
+                        setCardPlayingVisual(data.sound_id, true);
+                        setTimeout(() => setCardPlayingVisual(data.sound_id, false), 1800);
+
+                        // If triggered from outside this browser tab (e.g. desktop companion hotkey), play locally if headset is on
+                        if (data.client_id !== clientId) {
+                            const targetSound = sounds.find(s => s.id === data.sound_id) || data;
+                            playLocalSound(targetSound, data);
+                        }
+                    } else if (data.type === 'stop' || data.type === 'panic') {
+                        stopAllLocalAudio();
+                        activePlayingIds.clear();
+                        document.querySelectorAll('.numpad-key.playing').forEach(el => el.classList.remove('playing'));
+                    }
+                } catch (err) {}
+            };
+        } catch (err) {
+            console.warn('SSE not supported or connection error:', err);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Destination Toggles (Headset & Virtual Cable)
     // ─────────────────────────────────────────────────────────────────────────
     function setupDestinationToggles() {
+        updateHeadsetButtonUI();
+
         toggleHeadsetBtn.addEventListener('click', async () => {
             headsetEnabled = !headsetEnabled;
-            toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+            localStorage.setItem('soundboard_headset_enabled', headsetEnabled ? 'true' : 'false');
+            updateHeadsetButtonUI();
             await syncDestinationToggles();
         });
 
@@ -395,9 +484,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function updateHeadsetButtonUI() {
+        if (!toggleHeadsetBtn) return;
+        toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+        const label = document.getElementById('headset-btn-label') || toggleHeadsetBtn.querySelector('span:not(.dest-led)');
+        if (label) {
+            label.textContent = headsetEnabled ? '🎧 Headset (Live)' : '🎧 Headset (Off)';
+        }
+    }
+
     async function syncDestinationToggles() {
         try {
-            const res = await fetch('/api/routing_toggle', {
+            const res = await apiFetch('/api/routing_toggle', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -409,7 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'success') {
                 headsetEnabled = Boolean(data.headset_enabled);
                 cableEnabled = Boolean(data.cable_enabled);
-                toggleHeadsetBtn.classList.toggle('active', headsetEnabled);
+                updateHeadsetButtonUI();
                 toggleCableBtn.classList.toggle('active', cableEnabled);
             }
         } catch (err) {
@@ -427,14 +525,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setCardPlayingVisual(sound.id, true);
 
+        // Play locally through browser headphones if enabled
+        playLocalSound(sound, {
+            volume: soundVol,
+            speed: soundSpeed,
+            pitch: soundPitch
+        });
+
         try {
-            await fetch(`/api/play/${sound.id}`, {
+            await apiFetch(`/api/play/${sound.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     volume: soundVol,
                     pitch: soundPitch,
-                    speed: soundSpeed
+                    speed: soundSpeed,
+                    client_id: clientId
                 })
             });
         } catch (err) {
@@ -484,13 +590,14 @@ document.addEventListener('DOMContentLoaded', () => {
     async function stopSound(soundId) {
         setCardPlayingVisual(soundId, false);
         try {
-            await fetch(`/api/sounds/${soundId}/stop`, { method: 'POST' });
+            await apiFetch(`/api/sounds/${soundId}/stop`, { method: 'POST' });
         } catch (err) {
             console.error('Stop error:', err);
         }
     }
 
     async function panicStopAll() {
+        stopAllLocalAudio();
         activePlayingIds.clear();
         document.querySelectorAll('.numpad-key').forEach(c => {
             c.classList.remove('playing');
@@ -506,7 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            await fetch('/api/stop', { method: 'POST' });
+            await apiFetch('/api/panic', { method: 'POST' });
         } catch (err) {
             console.error('Panic stop error:', err);
         }
@@ -514,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function updateSoundConfig(soundId, updates) {
         try {
-            await fetch(`/api/sounds/${soundId}/edit`, {
+            await apiFetch(`/api/sounds/${soundId}/edit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates)
@@ -568,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(globalFxDebounceTimer);
         globalFxDebounceTimer = setTimeout(async () => {
             try {
-                await fetch('/api/global_fx', {
+                await apiFetch('/api/global_fx', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -633,7 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
             0.0, 1.0, 0.05,
             (val) => { masterVolume = val; updateVolumeKnobVisual(val); },
             async () => {
-                await fetch('/api/master_volume', {
+                await apiFetch('/api/master_volume', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ volume: masterVolume })
@@ -734,7 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function finalizeRebind(keyStr) {
         if (!rebindingSoundId) return;
         try {
-            const res = await fetch(`/api/sounds/${rebindingSoundId}/rebind`, {
+            const res = await apiFetch(`/api/sounds/${rebindingSoundId}/rebind`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ hotkey: keyStr })
@@ -810,7 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const secondary = secondaryDeviceSelect.value !== '' ? secondaryDeviceSelect.value : null;
 
             try {
-                await fetch('/api/devices', {
+                await apiFetch('/api/devices', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -819,7 +926,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         secondary_enabled: true
                     })
                 });
-                alert('Audio device settings saved!');
+
+                // If a Discord channel is selected, join it
+                if (discordChannelSelect && discordChannelSelect.value) {
+                    await apiFetch('/api/discord/join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ channel_id: discordChannelSelect.value })
+                    });
+                    await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
+                }
+
+                alert('Settings saved and connected!');
                 settingsModal.classList.add('hidden');
             } catch (err) {
                 console.error('Save audio settings error:', err);
@@ -830,7 +956,7 @@ document.addEventListener('DOMContentLoaded', () => {
         savePanicKeyBtn.addEventListener('click', async () => {
             const key = panicKeyInput.value.trim().toLowerCase();
             if (key) {
-                await fetch('/api/panic_key', {
+                await apiFetch('/api/panic_key', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ panic_key: key })
@@ -847,6 +973,98 @@ document.addEventListener('DOMContentLoaded', () => {
                 await playFromBrowser(sounds[0]);
             }
         });
+
+        // Discord Bot Controls
+        if (toggleDiscordBtn) {
+            toggleDiscordBtn.addEventListener('click', async () => {
+                const res = await apiFetch('/api/discord/status');
+                const status = await res.json();
+                if (!status.configured) {
+                    settingsModal.classList.remove('hidden');
+                    if (discordTokenInput) discordTokenInput.focus();
+                } else if (status.voice_connected) {
+                    await apiFetch('/api/discord/leave', { method: 'POST' });
+                    await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
+                } else {
+                    settingsModal.classList.remove('hidden');
+                }
+            });
+        }
+
+        if (saveDiscordTokenBtn) {
+            saveDiscordTokenBtn.addEventListener('click', async () => {
+                const token = discordTokenInput.value.trim();
+                if (!token) return;
+                saveDiscordTokenBtn.textContent = 'Connecting...';
+                try {
+                    const res = await apiFetch('/api/discord/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token })
+                    });
+                    const data = await res.json();
+                    saveDiscordTokenBtn.textContent = 'Connected!';
+                    setTimeout(() => { saveDiscordTokenBtn.textContent = 'Connect'; }, 2000);
+                    await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
+                } catch (err) {
+                    console.error('Discord config error:', err);
+                    saveDiscordTokenBtn.textContent = 'Connect';
+                }
+            });
+        }
+
+        if (discordJoinBtn) {
+            discordJoinBtn.addEventListener('click', async () => {
+                const channelId = discordChannelSelect.value;
+                if (!channelId) {
+                    alert('Please select a voice channel.');
+                    return;
+                }
+                discordJoinBtn.textContent = 'Joining...';
+                try {
+                    const res = await apiFetch('/api/discord/join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ channel_id: channelId })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        discordJoinBtn.textContent = 'Connected';
+                        await pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
+                    } else {
+                        alert(data.message || 'Failed to join voice channel');
+                        discordJoinBtn.textContent = 'Join Voice';
+                    }
+                } catch (err) {
+                    console.error('Discord join error:', err);
+                    discordJoinBtn.textContent = 'Join Voice';
+                }
+            });
+        }
 
         // Dropzone Upload
         dropzone.addEventListener('click', () => fileInput.click());
@@ -893,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('hotkey', uploadHotkeyInput.value);
 
             try {
-                const res = await fetch('/api/sounds/upload', {
+                const res = await apiFetch('/api/sounds/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -910,6 +1128,72 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Upload error:', err);
             }
         });
+        // Discord Status Polling
+        async function pollDiscordStatus() {
+            try {
+                const res = await apiFetch('/api/discord/status');
+                const st = await res.json();
+
+                if (toggleDiscordBtn && discordBtnLabel) {
+                    if (st.voice_connected) {
+                        toggleDiscordBtn.classList.add('active');
+                        discordBtnLabel.textContent = `👾 #${st.channel_name || 'Voice'}`;
+                    } else if (st.connected) {
+                        toggleDiscordBtn.classList.remove('active');
+                        discordBtnLabel.textContent = `👾 ${st.user ? st.user.split('#')[0] : 'Ready'}`;
+                    } else {
+                        toggleDiscordBtn.classList.remove('active');
+                        discordBtnLabel.textContent = `👾 Discord`;
+                    }
+                }
+
+                if (discordModalStatusBadge) {
+                    if (st.voice_connected) {
+                        discordModalStatusBadge.textContent = `Connected (${st.guild_name} ➔ #${st.channel_name})`;
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 font-medium border border-emerald-800/50';
+                    } else if (st.connected) {
+                        discordModalStatusBadge.textContent = `Bot Ready (${st.user})`;
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 font-medium border border-purple-800/50';
+                    } else if (st.error) {
+                        discordModalStatusBadge.textContent = `Error: ${st.error}`;
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-red-950 text-red-300 font-medium border border-red-800/50';
+                    } else if (st.is_connecting || st.configured) {
+                        discordModalStatusBadge.textContent = 'Connecting...';
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 font-medium';
+                    } else {
+                        discordModalStatusBadge.textContent = 'Idle (No Token)';
+                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium';
+                    }
+                }
+
+                if (discordChannelSelect && st.available_channels && st.available_channels.length > 0) {
+                    const currentVal = discordChannelSelect.value;
+                    discordChannelSelect.innerHTML = '<option value="">Select Voice Channel...</option>';
+                    st.available_channels.forEach(ch => {
+                        const opt = document.createElement('option');
+                        opt.value = ch.id;
+                        opt.textContent = ch.name;
+                        if (ch.id === st.channel_id || ch.id === currentVal) {
+                            opt.selected = true;
+                        }
+                        discordChannelSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                // Background poll ignore
+            }
+        }
+
+        pollDiscordStatus();
+
+        window.addEventListener('auth-state-ready', (e) => {
+            if (e.detail && e.detail.authorized) {
+                loadSounds();
+                loadDevices();
+            }
+        });
+
+        setInterval(pollDiscordStatus, 8000);
     }
 
     init();

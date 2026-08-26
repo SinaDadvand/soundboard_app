@@ -1,0 +1,61 @@
+name: Build and Push Docker Image to GCP Artifact Registry
+
+on:
+  push:
+    branches:
+      - main
+      - feature/containerized_fb_ar
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: 'p-np-adt-de'
+  GAR_LOCATION: 'us-west1'
+  REPOSITORY: 'soundboard-app-adt'
+  IMAGE_NAME: 'app'
+  WORKLOAD_IDENTITY_PROVIDER: 'projects/304516994920/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
+  SERVICE_ACCOUNT: 'sa-gha-ar-pusher-adt@p-np-adt-de.iam.gserviceaccount.com'
+
+jobs:
+  build-and-push:
+    name: Build & Push Container Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker Image
+        run: |
+          IMAGE_URI="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}"
+          docker build -t "${IMAGE_URI}:${{ github.sha }}" -t "${IMAGE_URI}:latest" .
+
+      - name: Push Docker Image to Artifact Registry
+        run: |
+          IMAGE_URI="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}"
+          docker push "${IMAGE_URI}:${{ github.sha }}"
+          docker push "${IMAGE_URI}:latest"
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: 'soundboard-app-fb-adt'
+          region: 'us-west1'
+          image: 'us-west1-docker.pkg.dev/p-np-adt-de/soundboard-app-adt/app:${{ github.sha }}'
