@@ -8,14 +8,15 @@ block_cipher = None
 
 a = Analysis(
     ['launcher.py'],
-    pathex=['.'],
+    pathex=['.', 'src'],
     binaries=[],
     datas=[
+        ('src', 'src'),
         ('templates', 'templates'),
         ('static/css', 'static/css'),
         ('static/js', 'static/js'),
-        ('app_icon.ico', '.'),
-        ('app_icon.png', '.'),
+        ('assets/app_icon.ico', 'assets'),
+        ('assets/app_icon.png', 'assets'),
         ('soundboard_config.json', '.'),
     ],
     hiddenimports=[
@@ -73,5 +74,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='app_icon.ico',
+    icon='assets/app_icon.ico',
 )
