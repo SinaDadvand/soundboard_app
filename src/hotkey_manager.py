@@ -127,6 +127,8 @@ class HotkeyManager:
         if KEYBOARD_AVAILABLE and keyboard is not None:
             try:
                 keyboard.parse_hotkey(clean_hk)
+            except (ImportError, OSError) as ex:
+                print(f"[HotkeyManager] Notice: Cannot validate hotkey via keyboard library ({ex})")
             except Exception as ex:
                 return False, f"Invalid hotkey syntax: {ex}"
 
