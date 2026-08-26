@@ -58,53 +58,54 @@ Whether deployed locally for offline streaming via OBS or hosted on **Google Clo
 flowchart TB
     subgraph ClientLayer ["Client & Control Layer"]
         User["👤 Gamer / Streamer"]
-        DesktopLauncher["🖥️ Desktop Launcher GUI\n(Tkinter Dark Neon)"]
-        HotkeyRelay["⌨️ Global Hotkey Relay\n(Windows OS Hook)"]
-        BrowserUI["🌐 Web Soundboard UI\n(HTML5 / Tailwind CSS / SSE)"]
+        DesktopLauncher["🖥️ Desktop Launcher GUI<br/>(Tkinter Dark Neon)"]
+        HotkeyRelay["⌨️ Global Hotkey Relay<br/>(Windows OS Hook)"]
+        BrowserUI["🌐 Web Soundboard UI<br/>(HTML5 / Tailwind CSS / SSE)"]
     end
 
     subgraph ServerLayer ["Cloud Run & Local Backend"]
-        FlaskServer["🐍 Flask Web Application\n(Gunicorn WSGI)"]
-        ConfigMgr["⚙️ Config Manager\n(soundboard_config.json)"]
-        AuthService["🔐 Auth Service\n(Firebase Bearer Token + RBAC)"]
+        FlaskServer["🐍 Flask Web Application<br/>(Gunicorn WSGI)"]
+        ConfigMgr["⚙️ Config Manager<br/>(soundboard_config.json)"]
+        AuthService["🔐 Auth Service<br/>(Firebase Bearer Token + RBAC)"]
     end
 
     subgraph AudioEngineLayer ["Real-Time DSP & Output Channels"]
-        DSPEngine["🎛️ DSP Audio Engine\n(Pitch · Speed · Echo · Reverb)"]
-        WebAudio["🎧 In-Browser Web Audio API\n(Local Polyphonic Headset)"]
-        DiscordBot["🤖 Discord Voice Bot\n(FFmpeg + Opus Encoder)"]
-        HardwareDevices["🔊 Physical Sound Cards\n(Headset + VB-Audio Cable)"]
+        DSPEngine["🎛️ DSP Audio Engine<br/>(Pitch · Speed · Echo · Reverb)"]
+        WebAudio["🎧 In-Browser Web Audio API<br/>(Local Polyphonic Headset)"]
+        DiscordBot["🤖 Discord Voice Bot<br/>(FFmpeg + Opus Encoder)"]
+        HardwareDevices["🔊 Physical Sound Cards<br/>(Headset + VB-Audio Cable)"]
     end
 
-    User -->|In-Game Numpad Keys| HotkeyRelay
-    User -->|UI Clicks & Knobs| BrowserUI
-    User -->|Launch Server| DesktopLauncher
+    User -->|"In-Game Numpad Keys"| HotkeyRelay
+    User -->|"UI Clicks & Knobs"| BrowserUI
+    User -->|"Launch Server"| DesktopLauncher
 
-    DesktopLauncher -->|Spawns Server & Relay| FlaskServer
-    HotkeyRelay -->|Async HTTP POST /api/play (X-Companion-Key)| FlaskServer
-    BrowserUI -->|Firebase OAuth Bearer Token| AuthService
-    AuthService -->|Validates User & Email Allowlist| FlaskServer
+    DesktopLauncher -->|"Spawns Server & Relay"| FlaskServer
+    HotkeyRelay -->|"Async HTTP POST /api/play (X-Companion-Key)"| FlaskServer
+    BrowserUI -->|"Firebase OAuth Bearer Token"| AuthService
+    AuthService -->|"Validates User & Email Allowlist"| FlaskServer
 
-    FlaskServer -->|Loads Settings| ConfigMgr
-    FlaskServer -->|Streams Event Stream /api/events| BrowserUI
-    FlaskServer -->|Renders Web Audio| BrowserUI -->|Local Headphone Output| WebAudio
-    FlaskServer -->|Routes PCM Buffer| DSPEngine
+    FlaskServer -->|"Loads Settings"| ConfigMgr
+    FlaskServer -->|"Streams Event Stream /api/events"| BrowserUI
+    FlaskServer -->|"Renders Web Audio"| BrowserUI
+    BrowserUI -->|"Local Headphone Output"| WebAudio
+    FlaskServer -->|"Routes PCM Buffer"| DSPEngine
 
-    DSPEngine -->|WASAPI Multi-Stream| HardwareDevices
-    FlaskServer -->|Sends Opus Voice Packets| DiscordBot
+    DSPEngine -->|"WASAPI Multi-Stream"| HardwareDevices
+    FlaskServer -->|"Sends Opus Voice Packets"| DiscordBot
 ```
 
 ### 2. DSP Audio Processing Pipeline
 ```mermaid
 flowchart LR
-    AudioFile["🎵 Audio File\n(.mp3 / .wav / .flac)"] --> Gain["🔊 Master Volume Scaling\n(0.0x - 2.0x)"]
-    Gain --> Pitch["🎼 Pitch Shift\n(-12 to +12 semitones)"]
-    Pitch --> Speed["⏩ Playback Speed\n(0.5x to 2.0x)"]
-    Speed --> Echo["🔁 Multi-Tap Echo\n(Feedback Loop)"]
-    Echo --> Reverb["🏛️ Schroeder Reverb\n(Comb & All-Pass Filters)"]
-    Reverb --> Output1["🎧 Physical Headset Output\n(WASAPI Speaker)"]
-    Reverb --> Output2["🎙️ Virtual Audio Cable\n(VB-Cable Input to OBS)"]
-    Reverb --> Output3["🤖 Discord Voice Channel\n(Opus Stream)"]
+    AudioFile["🎵 Audio File<br/>(.mp3 / .wav / .flac)"] --> Gain["🔊 Master Volume Scaling<br/>(0.0x - 2.0x)"]
+    Gain --> Pitch["🎼 Pitch Shift<br/>(-12 to +12 semitones)"]
+    Pitch --> Speed["⏩ Playback Speed<br/>(0.5x to 2.0x)"]
+    Speed --> Echo["🔁 Multi-Tap Echo<br/>(Feedback Loop)"]
+    Echo --> Reverb["🏛️ Schroeder Reverb<br/>(Comb & All-Pass Filters)"]
+    Reverb --> Output1["🎧 Physical Headset Output<br/>(WASAPI Speaker)"]
+    Reverb --> Output2["🎙️ Virtual Audio Cable<br/>(VB-Cable Input to OBS)"]
+    Reverb --> Output3["🤖 Discord Voice Channel<br/>(Opus Stream)"]
 ```
 
 ---
