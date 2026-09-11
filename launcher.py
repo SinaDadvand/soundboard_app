@@ -243,16 +243,37 @@ class SoundboardLauncher(tk.Tk):
         self.configure(bg=self.C_BG)
         self.protocol('WM_DELETE_WINDOW', self._quit)
 
-        # Set Window Icon
-        icon_candidates = [
-            os.path.join(_EXE_DIR, 'app_icon.ico'),
+        # Set Window & Taskbar Icon
+        ico_candidates = [
+            os.path.join(_BUNDLE, 'assets', 'app_icon.ico'),
+            os.path.join(_EXE_DIR, 'assets', 'app_icon.ico'),
             os.path.join(_BUNDLE, 'app_icon.ico'),
-            os.path.join(_EXE_DIR, 'static', 'favicon.ico')
+            os.path.join(_EXE_DIR, 'app_icon.ico'),
+            os.path.join(_EXE_DIR, 'static', 'favicon.ico'),
         ]
-        for icon_path in icon_candidates:
-            if os.path.exists(icon_path):
+        for ico_path in ico_candidates:
+            if os.path.exists(ico_path):
                 try:
-                    self.iconbitmap(icon_path)
+                    self.iconbitmap(default=ico_path)
+                    break
+                except Exception:
+                    try:
+                        self.iconbitmap(ico_path)
+                        break
+                    except Exception:
+                        pass
+
+        png_candidates = [
+            os.path.join(_BUNDLE, 'assets', 'app_icon.png'),
+            os.path.join(_EXE_DIR, 'assets', 'app_icon.png'),
+            os.path.join(_BUNDLE, 'app_icon.png'),
+            os.path.join(_EXE_DIR, 'app_icon.png'),
+        ]
+        for png_path in png_candidates:
+            if os.path.exists(png_path):
+                try:
+                    self._icon_img = tk.PhotoImage(file=png_path)
+                    self.iconphoto(True, self._icon_img)
                     break
                 except Exception:
                     pass
@@ -530,4 +551,12 @@ class SoundboardLauncher(tk.Tk):
 
 
 if __name__ == '__main__':
+    # Set explicit Windows Application User Model ID so Taskbar icon links properly
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('soundboard.virtualsoundboard.launcher.2.2')
+        except Exception:
+            pass
+
     SoundboardLauncher().mainloop()
