@@ -13,7 +13,7 @@
   "cable_enabled": false,
   "sounds": [
     {
-      "id": "76d3ca58",
+      "id": "bc7d2fda",
       "filename": "a-great-success.mp3",
       "name": "a-great-success",
       "hotkey": "ctrl+7",
@@ -61,9 +61,9 @@
       "order": 3
     },
     {
-      "id": "86374c8f",
-      "filename": "Damn Son!.mp3",
-      "name": "Damn Son!",
+      "id": "9e820dd4",
+      "filename": "Daiomn!.mp3",
+      "name": "Daiomn!",
       "hotkey": "ctrl+5",
       "symbol": "5",
       "modifier": "ctrl",
@@ -73,9 +73,9 @@
       "order": 4
     },
     {
-      "id": "87dfcaf9",
-      "filename": "Faaah.mp3",
-      "name": "Faaah",
+      "id": "86374c8f",
+      "filename": "Damn Son!.mp3",
+      "name": "Damn Son!",
       "hotkey": "ctrl+6",
       "symbol": "6",
       "modifier": "ctrl",
@@ -85,9 +85,9 @@
       "order": 5
     },
     {
-      "id": "aa7ebbea",
-      "filename": "For the Love of God!.mp3",
-      "name": "For the Love of God!",
+      "id": "87dfcaf9",
+      "filename": "Faaah.mp3",
+      "name": "Faaah",
       "hotkey": "ctrl+1",
       "symbol": "1",
       "modifier": "ctrl",
@@ -97,9 +97,9 @@
       "order": 6
     },
     {
-      "id": "9d70d785",
-      "filename": "Game Over Man!.mp3",
-      "name": "Game Over Man!",
+      "id": "aa7ebbea",
+      "filename": "For the Love of God!.mp3",
+      "name": "For the Love of God!",
       "hotkey": "ctrl+2",
       "symbol": "2",
       "modifier": "ctrl",
@@ -109,9 +109,9 @@
       "order": 7
     },
     {
-      "id": "8ad9aef4",
-      "filename": "GodDamn NubNub.mp3",
-      "name": "GodDamn NubNub",
+      "id": "9d70d785",
+      "filename": "Game Over Man!.mp3",
+      "name": "Game Over Man!",
       "hotkey": "ctrl+3",
       "symbol": "3",
       "modifier": "ctrl",
@@ -121,9 +121,9 @@
       "order": 8
     },
     {
-      "id": "4f052f3f",
-      "filename": "goddamn.mp3",
-      "name": "goddamn",
+      "id": "8ad9aef4",
+      "filename": "GodDamn NubNub.mp3",
+      "name": "GodDamn NubNub",
       "hotkey": "ctrl+0",
       "symbol": "0",
       "modifier": "ctrl",
@@ -133,9 +133,9 @@
       "order": 9
     },
     {
-      "id": "c893bf55",
-      "filename": "Hotpocket.mp3",
-      "name": "Hotpocket",
+      "id": "4f052f3f",
+      "filename": "goddamn.mp3",
+      "name": "goddamn",
       "hotkey": "ctrl+.",
       "symbol": ".",
       "modifier": "ctrl",
@@ -145,9 +145,9 @@
       "order": 10
     },
     {
-      "id": "42fc20b7",
-      "filename": "i-got-this-fahhhhhh.mp3",
-      "name": "i-got-this-fahhhhhh",
+      "id": "5b45662b",
+      "filename": "helicopter.mp3",
+      "name": "helicopter",
       "hotkey": "alt+7",
       "symbol": "7",
       "modifier": "alt",
@@ -157,9 +157,9 @@
       "order": 11
     },
     {
-      "id": "85b2ffa9",
-      "filename": "ITYSL didn't do shit.mp3",
-      "name": "ITYSL didn't do shit",
+      "id": "c893bf55",
+      "filename": "Hotpocket.mp3",
+      "name": "Hotpocket",
       "hotkey": "alt+8",
       "symbol": "8",
       "modifier": "alt",
@@ -169,9 +169,9 @@
       "order": 12
     },
     {
-      "id": "f3fa6378",
-      "filename": "ITYSL Sucks!.mp3",
-      "name": "ITYSL Sucks!",
+      "id": "42fc20b7",
+      "filename": "i-got-this-fahhhhhh.mp3",
+      "name": "i-got-this-fahhhhhh",
       "hotkey": "alt+9",
       "symbol": "9",
       "modifier": "alt",
@@ -181,9 +181,9 @@
       "order": 13
     },
     {
-      "id": "73440845",
-      "filename": "ITYSL What the Fuck are you doing.mp3",
-      "name": "ITYSL What the Fuck are you doing",
+      "id": "85b2ffa9",
+      "filename": "ITYSL didn't do shit.mp3",
+      "name": "ITYSL didn't do shit",
       "hotkey": "alt+4",
       "symbol": "4",
       "modifier": "alt",
@@ -229,9 +229,9 @@
       "order": 17
     },
     {
-      "id": "49bad40c",
-      "filename": "My Child!.mp3",
-      "name": "My Child!",
+      "id": "8337e982",
+      "filename": "naughty-naughty.mp3",
+      "name": "naughty-naughty",
       "hotkey": "alt+2",
       "symbol": "2",
       "modifier": "alt",
@@ -241,9 +241,9 @@
       "order": 18
     },
     {
-      "id": "8337e982",
-      "filename": "naughty-naughty.mp3",
-      "name": "naughty-naughty",
+      "id": "fc3a4a9b",
+      "filename": "no-no-wait-wait.mp3",
+      "name": "no-no-wait-wait",
       "hotkey": "alt+3",
       "symbol": "3",
       "modifier": "alt",
@@ -253,9 +253,9 @@
       "order": 19
     },
     {
-      "id": "fc3a4a9b",
-      "filename": "no-no-wait-wait.mp3",
-      "name": "no-no-wait-wait",
+      "id": "9f37056f",
+      "filename": "Oh My God -1.mp3",
+      "name": "Oh My God -1",
       "hotkey": "alt+0",
       "symbol": "0",
       "modifier": "alt",
@@ -265,9 +265,9 @@
       "order": 20
     },
     {
-      "id": "9f37056f",
-      "filename": "Oh My God -1.mp3",
-      "name": "Oh My God -1",
+      "id": "87cd32f0",
+      "filename": "Oh My God -2.mp3",
+      "name": "Oh My God -2",
       "hotkey": "alt+.",
       "symbol": ".",
       "modifier": "alt",
@@ -277,9 +277,9 @@
       "order": 21
     },
     {
-      "id": "87cd32f0",
-      "filename": "Oh My God -2.mp3",
-      "name": "Oh My God -2",
+      "id": "98e9e298",
+      "filename": "Oh My God -3.mp3",
+      "name": "Oh My God -3",
       "hotkey": "ctrl+alt+7",
       "symbol": "7",
       "modifier": "ctrl+alt",
@@ -289,9 +289,9 @@
       "order": 22
     },
     {
-      "id": "98e9e298",
-      "filename": "Oh My God -3.mp3",
-      "name": "Oh My God -3",
+      "id": "6f4a1913",
+      "filename": "OH SHIT!.mp3",
+      "name": "OH SHIT!",
       "hotkey": "ctrl+alt+8",
       "symbol": "8",
       "modifier": "ctrl+alt",
@@ -301,9 +301,9 @@
       "order": 23
     },
     {
-      "id": "6f4a1913",
-      "filename": "OH SHIT!.mp3",
-      "name": "OH SHIT!",
+      "id": "e40a45d4",
+      "filename": "Sax getting louder!.mp3",
+      "name": "Sax getting louder!",
       "hotkey": "ctrl+alt+9",
       "symbol": "9",
       "modifier": "ctrl+alt",
@@ -337,9 +337,9 @@
       "order": 26
     },
     {
-      "id": "aecac05e",
-      "filename": "Wario I missed!.mp3",
-      "name": "Wario I missed!",
+      "id": "9472b12f",
+      "filename": "Wario Waaaa.mp3",
+      "name": "Wario Waaaa",
       "hotkey": "ctrl+alt+6",
       "symbol": "6",
       "modifier": "ctrl+alt",
@@ -349,9 +349,9 @@
       "order": 27
     },
     {
-      "id": "9472b12f",
-      "filename": "Wario Waaaa.mp3",
-      "name": "Wario Waaaa",
+      "id": "c9fcd9c5",
+      "filename": "Welcome to HELL!.mp3",
+      "name": "Welcome to HELL!",
       "hotkey": "ctrl+alt+1",
       "symbol": "1",
       "modifier": "ctrl+alt",
@@ -373,9 +373,9 @@
       "order": 29
     },
     {
-      "id": "431709ae",
-      "filename": "WTF Yall!.mp3",
-      "name": "WTF Yall!",
+      "id": "9b681623",
+      "filename": "Whuat!.mp3",
+      "name": "Whuat!",
       "hotkey": "ctrl+alt+3",
       "symbol": "3",
       "modifier": "ctrl+alt",
@@ -385,9 +385,9 @@
       "order": 30
     },
     {
-      "id": "ae6b470e",
-      "filename": "Yeah Baby!.mp3",
-      "name": "Yeah Baby!",
+      "id": "431709ae",
+      "filename": "WTF Yall!.mp3",
+      "name": "WTF Yall!",
       "hotkey": "ctrl+alt+0",
       "symbol": "0",
       "modifier": "ctrl+alt",
@@ -397,9 +397,9 @@
       "order": 31
     },
     {
-      "id": "c5a142f1",
-      "filename": "YEET.mp3",
-      "name": "YEET",
+      "id": "ae6b470e",
+      "filename": "Yeah Baby!.mp3",
+      "name": "Yeah Baby!",
       "hotkey": "ctrl+alt+.",
       "symbol": ".",
       "modifier": "ctrl+alt",
