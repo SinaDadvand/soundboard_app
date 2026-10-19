@@ -97,9 +97,9 @@
       "order": 6
     },
     {
-      "id": "aa7ebbea",
-      "filename": "For the Love of God!.mp3",
-      "name": "For the Love of God!",
+      "id": "8ad9aef4",
+      "filename": "GodDamn NubNub.mp3",
+      "name": "GodDamn NubNub",
       "hotkey": "ctrl+2",
       "symbol": "2",
       "modifier": "ctrl",
@@ -109,9 +109,9 @@
       "order": 7
     },
     {
-      "id": "9d70d785",
-      "filename": "Game Over Man!.mp3",
-      "name": "Game Over Man!",
+      "id": "4f052f3f",
+      "filename": "goddamn.mp3",
+      "name": "goddamn",
       "hotkey": "ctrl+3",
       "symbol": "3",
       "modifier": "ctrl",
@@ -121,9 +121,9 @@
       "order": 8
     },
     {
-      "id": "8ad9aef4",
-      "filename": "GodDamn NubNub.mp3",
-      "name": "GodDamn NubNub",
+      "id": "5b45662b",
+      "filename": "helicopter.mp3",
+      "name": "helicopter",
       "hotkey": "ctrl+0",
       "symbol": "0",
       "modifier": "ctrl",
@@ -133,9 +133,9 @@
       "order": 9
     },
     {
-      "id": "4f052f3f",
-      "filename": "goddamn.mp3",
-      "name": "goddamn",
+      "id": "c893bf55",
+      "filename": "Hotpocket.mp3",
+      "name": "Hotpocket",
       "hotkey": "ctrl+.",
       "symbol": ".",
       "modifier": "ctrl",
@@ -145,9 +145,9 @@
       "order": 10
     },
     {
-      "id": "5b45662b",
-      "filename": "helicopter.mp3",
-      "name": "helicopter",
+      "id": "eb31cc4f",
+      "filename": "i-almost-died(1).mp3",
+      "name": "i-almost-died(1)",
       "hotkey": "alt+7",
       "symbol": "7",
       "modifier": "alt",
@@ -157,9 +157,9 @@
       "order": 11
     },
     {
-      "id": "c893bf55",
-      "filename": "Hotpocket.mp3",
-      "name": "Hotpocket",
+      "id": "42fc20b7",
+      "filename": "i-got-this-fahhhhhh.mp3",
+      "name": "i-got-this-fahhhhhh",
       "hotkey": "alt+8",
       "symbol": "8",
       "modifier": "alt",
@@ -169,9 +169,9 @@
       "order": 12
     },
     {
-      "id": "42fc20b7",
-      "filename": "i-got-this-fahhhhhh.mp3",
-      "name": "i-got-this-fahhhhhh",
+      "id": "85b2ffa9",
+      "filename": "ITYSL didn't do shit.mp3",
+      "name": "ITYSL didn't do shit",
       "hotkey": "alt+9",
       "symbol": "9",
       "modifier": "alt",
@@ -181,9 +181,9 @@
       "order": 13
     },
     {
-      "id": "85b2ffa9",
-      "filename": "ITYSL didn't do shit.mp3",
-      "name": "ITYSL didn't do shit",
+      "id": "49ba1f1d",
+      "filename": "Jesus.mp3",
+      "name": "Jesus",
       "hotkey": "alt+4",
       "symbol": "4",
       "modifier": "alt",
@@ -193,9 +193,9 @@
       "order": 14
     },
     {
-      "id": "49ba1f1d",
-      "filename": "Jesus.mp3",
-      "name": "Jesus",
+      "id": "27a1860d",
+      "filename": "Kill me!.mp3",
+      "name": "Kill me!",
       "hotkey": "alt+5",
       "symbol": "5",
       "modifier": "alt",
@@ -205,9 +205,9 @@
       "order": 15
     },
     {
-      "id": "27a1860d",
-      "filename": "Kill me!.mp3",
-      "name": "Kill me!",
+      "id": "a5a65c15",
+      "filename": "Mario.mp3",
+      "name": "Mario",
       "hotkey": "alt+6",
       "symbol": "6",
       "modifier": "alt",
@@ -217,9 +217,9 @@
       "order": 16
     },
     {
-      "id": "a5a65c15",
-      "filename": "Mario.mp3",
-      "name": "Mario",
+      "id": "f378516b",
+      "filename": "myinstants.mp3",
+      "name": "myinstants",
       "hotkey": "alt+1",
       "symbol": "1",
       "modifier": "alt",
