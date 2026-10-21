@@ -23,7 +23,9 @@ def test_engine():
     assert len(devices) > 0, "No output devices found"
     
     # 2. Test Audio Loading
-    test_file = os.path.join(audio_dir, 'All Day.mp3')
+    audio_files = sorted([f for f in os.listdir(audio_dir) if f.lower().endswith(('.mp3', '.wav', '.ogg', '.flac'))])
+    assert len(audio_files) > 0, "No audio files found in audio directory"
+    test_file = os.path.join(audio_dir, audio_files[0])
     data, sr = engine.load_audio(test_file)
     print(f"[TEST] Loaded audio {test_file}: shape={data.shape}, sr={sr}")
     assert data.ndim == 2 and data.shape[1] == 2, "Audio should be stereo"

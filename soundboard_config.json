@@ -13,7 +13,7 @@
   "cable_enabled": false,
   "sounds": [
     {
-      "id": "bc7d2fda",
+      "id": "3073a1f1",
       "filename": "a-great-success.mp3",
       "name": "a-great-success",
       "hotkey": "ctrl+7",
@@ -25,9 +25,9 @@
       "order": 0
     },
     {
-      "id": "f9b9c36d",
-      "filename": "aerobic-meltdown (mp3cut.net).mp3",
-      "name": "aerobic-meltdown (mp3cut.net)",
+      "id": "8a3a3de7",
+      "filename": "Absolute_Dogshit.mp3",
+      "name": "Absolute_Dogshit",
       "hotkey": "ctrl+8",
       "symbol": "8",
       "modifier": "ctrl",
@@ -37,9 +37,9 @@
       "order": 1
     },
     {
-      "id": "bab5666e",
-      "filename": "All Day.mp3",
-      "name": "All Day",
+      "id": "f9b9c36d",
+      "filename": "aerobic-meltdown (mp3cut.net).mp3",
+      "name": "aerobic-meltdown (mp3cut.net)",
       "hotkey": "ctrl+9",
       "symbol": "9",
       "modifier": "ctrl",
@@ -49,9 +49,9 @@
       "order": 2
     },
     {
-      "id": "f7273944",
-      "filename": "Choppa!.mp3",
-      "name": "Choppa!",
+      "id": "63b790a3",
+      "filename": "Cutting.mp3",
+      "name": "Cutting",
       "hotkey": "ctrl+4",
       "symbol": "4",
       "modifier": "ctrl",
@@ -193,9 +193,9 @@
       "order": 14
     },
     {
-      "id": "27a1860d",
-      "filename": "Kill me!.mp3",
-      "name": "Kill me!",
+      "id": "0314651e",
+      "filename": "khwai.mp3",
+      "name": "khwai",
       "hotkey": "alt+5",
       "symbol": "5",
       "modifier": "alt",
@@ -205,9 +205,9 @@
       "order": 15
     },
     {
-      "id": "a5a65c15",
-      "filename": "Mario.mp3",
-      "name": "Mario",
+      "id": "27a1860d",
+      "filename": "Kill me!.mp3",
+      "name": "Kill me!",
       "hotkey": "alt+6",
       "symbol": "6",
       "modifier": "alt",
@@ -217,9 +217,9 @@
       "order": 16
     },
     {
-      "id": "f378516b",
-      "filename": "myinstants.mp3",
-      "name": "myinstants",
+      "id": "a5a65c15",
+      "filename": "Mario.mp3",
+      "name": "Mario",
       "hotkey": "alt+1",
       "symbol": "1",
       "modifier": "alt",
@@ -301,9 +301,9 @@
       "order": 23
     },
     {
-      "id": "e40a45d4",
-      "filename": "Sax getting louder!.mp3",
-      "name": "Sax getting louder!",
+      "id": "b00e810f",
+      "filename": "Plubbered_in_Head.mp3",
+      "name": "Plubbered_in_Head",
       "hotkey": "ctrl+alt+9",
       "symbol": "9",
       "modifier": "ctrl+alt",
@@ -313,9 +313,9 @@
       "order": 24
     },
     {
-      "id": "17099335",
-      "filename": "Some Good, Some Shit!.mp3",
-      "name": "Some Good, Some Shit!",
+      "id": "e40a45d4",
+      "filename": "Sax getting louder!.mp3",
+      "name": "Sax getting louder!",
       "hotkey": "ctrl+alt+4",
       "symbol": "4",
       "modifier": "ctrl+alt",
@@ -325,9 +325,9 @@
       "order": 25
     },
     {
-      "id": "89a03172",
-      "filename": "surprise-mf.mp3",
-      "name": "surprise-mf",
+      "id": "17099335",
+      "filename": "Some Good, Some Shit!.mp3",
+      "name": "Some Good, Some Shit!",
       "hotkey": "ctrl+alt+5",
       "symbol": "5",
       "modifier": "ctrl+alt",
@@ -337,9 +337,9 @@
       "order": 26
     },
     {
-      "id": "9472b12f",
-      "filename": "Wario Waaaa.mp3",
-      "name": "Wario Waaaa",
+      "id": "89a03172",
+      "filename": "surprise-mf.mp3",
+      "name": "surprise-mf",
       "hotkey": "ctrl+alt+6",
       "symbol": "6",
       "modifier": "ctrl+alt",
