@@ -75,8 +75,14 @@ if getattr(sys, 'frozen', False):
     CONFIG_PATH = next((p for p in config_candidates if os.path.exists(p)), os.path.join(EXE_DIR, 'soundboard_config.json'))
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    AUDIO_FOLDER = os.path.join(BASE_DIR, 'static', 'audio')
-    CONFIG_PATH = os.path.join(BASE_DIR, 'soundboard_config.json')
+    CONFIG_PATH = os.environ.get('CONFIG_PATH') or os.path.join(BASE_DIR, 'soundboard_config.json')
+
+    env_audio = os.environ.get('AUDIO_DIR')
+    if env_audio and os.path.exists(env_audio):
+        sub_audio = os.path.join(env_audio, 'audio')
+        AUDIO_FOLDER = sub_audio if os.path.exists(sub_audio) else env_audio
+    else:
+        AUDIO_FOLDER = env_audio or os.path.join(BASE_DIR, 'static', 'audio')
 
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 print(f"[Soundboard] Using Audio Folder: {AUDIO_FOLDER}")

@@ -9,6 +9,7 @@ Organized into 3 standard numpad modifier sections: Ctrl, Alt, Ctrl+Alt.
 import os
 import json
 import uuid
+import re
 
 # 3 Numpad Layout Groups (ordered as: 7, 8, 9, 4, 5, 6, 1, 2, 3, 0, .)
 NUMPAD_KEY_ORDER = [
@@ -37,8 +38,14 @@ class ConfigManager:
         curr_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(curr_dir)
 
-        default_config = os.path.join(root_dir, 'soundboard_config.json')
-        default_audio = os.path.join(root_dir, 'static', 'audio')
+        default_config = os.environ.get('CONFIG_PATH') or os.path.join(root_dir, 'soundboard_config.json')
+
+        env_audio = os.environ.get('AUDIO_DIR')
+        if env_audio and os.path.exists(env_audio):
+            sub_audio = os.path.join(env_audio, 'audio')
+            default_audio = sub_audio if os.path.exists(sub_audio) else env_audio
+        else:
+            default_audio = env_audio or os.path.join(root_dir, 'static', 'audio')
 
         self.config_path = config_path or default_config
         self.audio_dir = audio_dir or default_audio
@@ -78,10 +85,34 @@ class ConfigManager:
         return config
 
     def sync_audio_files(self, config, force_reassign_hotkeys=True):
-        """Ensure all audio files in the audio folder have structured numpad config entries sorted A to Z."""
+        """Ensure all audio files in the audio folder have structured numpad config entries.
+        Files starting with numbers (e.g. 1_airhorn.mp3, 2_choppa.mp3) are sorted numerically ascending."""
         valid_exts = ('.mp3', '.wav', '.ogg', '.flac')
         existing_files = [f for f in os.listdir(self.audio_dir) if f.lower().endswith(valid_exts)]
-        existing_files.sort(key=lambda x: x.lower())
+
+        def natural_sort_key(filename):
+            base = os.path.splitext(filename)[0]
+            # Match patterns like "1_sound", "01_sound", "2-sound", "1 sound"
+            match = re.match(r'^(\d+)[_\-\s]+(.*)$', base)
+            if match:
+                num = int(match.group(1))
+                rest = match.group(2).lower()
+                return (0, num, rest)
+            elif base.isdigit():
+                return (0, int(base), '')
+            else:
+                return (1, 0, base.lower())
+
+        existing_files.sort(key=natural_sort_key)
+
+        def extract_display_name(filename):
+            base = os.path.splitext(filename)[0]
+            match = re.match(r'^(\d+)[_\-\s]+(.*)$', base)
+            if match and match.group(2).strip():
+                clean = match.group(2).strip()
+            else:
+                clean = base
+            return clean.replace('_', ' ').replace('-', ' ').title()
 
         sound_map = {s['filename']: s for s in config.get('sounds', [])}
         updated_sounds = []
@@ -94,7 +125,7 @@ class ConfigManager:
             if filename in sound_map:
                 entry = sound_map[filename]
                 entry.setdefault('id', str(uuid.uuid4())[:8])
-                entry.setdefault('name', os.path.splitext(filename)[0])
+                entry.setdefault('name', extract_display_name(filename))
                 if force_reassign_hotkeys or not entry.get('hotkey'):
                     entry['hotkey'] = key_info[0]
                     entry['symbol'] = key_info[1]
@@ -105,11 +136,10 @@ class ConfigManager:
                 entry['order'] = idx
                 updated_sounds.append(entry)
             else:
-                clean_name = os.path.splitext(filename)[0]
                 new_entry = {
                     'id': str(uuid.uuid4())[:8],
                     'filename': filename,
-                    'name': clean_name,
+                    'name': extract_display_name(filename),
                     'hotkey': key_info[0],
                     'symbol': key_info[1],
                     'modifier': key_info[2],

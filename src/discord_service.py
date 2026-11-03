@@ -155,7 +155,13 @@ class DiscordService:
             self.is_running = True
             self.is_connecting = False
             self.last_error = None
-            print(f"[DiscordService] Logged in as {self.bot.user} (ID: {self.bot.user.id})")
+            bot_display_name = os.environ.get('BOT_NAME') or (f"Soundboard ({os.environ.get('USER_NAME').title()})" if os.environ.get('USER_NAME') else "Virtual Soundboard")
+            try:
+                activity = discord.Activity(type=discord.ActivityType.listening, name=bot_display_name)
+                await self.bot.change_presence(activity=activity)
+            except Exception as e:
+                print(f"[DiscordService] Could not set presence: {e}")
+            print(f"[DiscordService] Logged in as {self.bot.user} (ID: {self.bot.user.id}) - Display: '{bot_display_name}'")
             if self.default_channel_id:
                 try:
                     await self._join_channel_internal(int(self.default_channel_id))
@@ -226,6 +232,14 @@ class DiscordService:
             # Ensure continuous polyphonic mixer is attached to the voice client
             if self.voice_client and not self.voice_client.is_playing():
                 self.voice_client.play(self.mixer)
+
+            # Attempt to set distinguishable bot nickname in guild if configured
+            bot_display_name = os.environ.get('BOT_NAME') or (f"Soundboard ({os.environ.get('USER_NAME').title()})" if os.environ.get('USER_NAME') else None)
+            if bot_display_name and channel.guild and channel.guild.me:
+                try:
+                    await channel.guild.me.edit(nick=bot_display_name)
+                except Exception:
+                    pass
 
             return True, f"Connected to {channel.name}"
         except Exception as e:
