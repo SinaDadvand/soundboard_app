@@ -5,7 +5,7 @@ FROM python:3.11-slim
 LABEL maintainer="Virtual Soundboard" \
       version="2.4-cloud-auth" \
       description="Virtual Soundboard Pro with Real-Time DSP, Discord Voice Streaming, and Firebase Auth"
-# Build trigger: 2026-11-04 Re-deploy ADT container with per-user audio & FUSE support
+# Build trigger: 2026-11-04 Deploy multi-user Cloud Run instances with latest Discord secret tokens
 
 # Set environment variables for Python and Cloud Run
 ENV PYTHONDONTWRITEBYTECODE=1 \
