@@ -22,10 +22,12 @@ logging.getLogger('discord').setLevel(logging.WARNING)
 logging.getLogger('discord.voice_client').setLevel(logging.DEBUG)
 logging.getLogger('discord.player').setLevel(logging.DEBUG)
 logging.getLogger('discord.voice_state').setLevel(logging.DEBUG)
+logging.getLogger('discord.gateway').setLevel(logging.INFO)
 
 try:
     import discord
     from discord.ext import commands
+    import struct
     DISCORD_AVAILABLE = True
     BasePCMAudio = discord.PCMAudio
     # Ensure Opus is loaded on Linux
@@ -36,6 +38,110 @@ try:
                 break
             except Exception:
                 pass
+
+    # --- DAVE Protocol State-Machine Patch for discord.py 2.7.x ---
+    # discord.py 2.7.x connects to DAVE (E2EE) voice channels, but its gateway handler
+    # omits calls to state.dave_session.prepare_transition(...) and execute_transition(...),
+    # causing dave_session.ready to remain False and unencrypted Opus frames to be dropped.
+    try:
+        import davey
+        import discord.gateway
+        import discord.voice_state
+
+        _orig_recv_binary = discord.gateway.DiscordVoiceWebSocket.received_binary_message
+
+        async def _patched_recv_binary(self, msg: bytes) -> None:
+            self.seq_ack = struct.unpack_from('>H', msg, 0)[0]
+            op = msg[2]
+            state = self._connection
+
+            if state.dave_session is not None:
+                if op == self.MLS_PROPOSALS:
+                    optype = msg[3]
+                    result = state.dave_session.process_proposals(
+                        davey.ProposalsOperationType.append if optype == 0 else davey.ProposalsOperationType.revoke, msg[4:]
+                    )
+                    if isinstance(result, davey.CommitWelcome):
+                        await self.send_binary(
+                            discord.gateway.DiscordVoiceWebSocket.MLS_COMMIT_WELCOME,
+                            result.commit + result.welcome if result.welcome else result.commit,
+                        )
+                        try:
+                            state.dave_session.process_commit(result.commit)
+                            state.dave_session.prepare_transition(0, state.dave_protocol_version)
+                            print(f"[DiscordService-DAVE] Own commit processed & prepared transition 0 | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
+                        except Exception as ce:
+                            print(f"[DiscordService-DAVE] Own commit processing notice: {ce}")
+                    return
+
+                elif op == self.MLS_ANNOUNCE_COMMIT_TRANSITION:
+                    transition_id = struct.unpack_from('>H', msg, 3)[0]
+                    try:
+                        state.dave_session.process_commit(msg[5:])
+                        try:
+                            state.dave_session.prepare_transition(transition_id, state.dave_protocol_version)
+                        except Exception:
+                            pass
+                        if transition_id != 0:
+                            state.dave_pending_transitions[transition_id] = state.dave_protocol_version
+                            await self.send_transition_ready(transition_id)
+                        print(f"[DiscordService-DAVE] MLS commit transition {transition_id} processed | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
+                    except Exception:
+                        await state._recover_from_invalid_commit(transition_id)
+                    return
+
+                elif op == self.MLS_WELCOME:
+                    transition_id = struct.unpack_from('>H', msg, 3)[0]
+                    try:
+                        state.dave_session.process_welcome(msg[5:])
+                        try:
+                            state.dave_session.prepare_transition(transition_id, state.dave_protocol_version)
+                        except Exception:
+                            pass
+                        if transition_id != 0:
+                            state.dave_pending_transitions[transition_id] = state.dave_protocol_version
+                            await self.send_transition_ready(transition_id)
+                        print(f"[DiscordService-DAVE] MLS welcome transition {transition_id} processed | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
+                    except Exception:
+                        await state._recover_from_invalid_commit(transition_id)
+                    return
+
+            await _orig_recv_binary(self, msg)
+
+        discord.gateway.DiscordVoiceWebSocket.received_binary_message = _patched_recv_binary
+
+        _orig_exec_trans = discord.voice_state.VoiceConnectionState._execute_transition
+
+        async def _patched_exec_trans(self, transition_id: int) -> None:
+            if self.dave_session:
+                try:
+                    self.dave_session.execute_transition(transition_id)
+                    print(f"[DiscordService-DAVE] Executed DAVE transition id {transition_id} | ready={self.dave_session.ready}, can_encrypt={self.can_encrypt}")
+                except Exception as e:
+                    print(f"[DiscordService-DAVE] Transition execute notice: {e}")
+            await _orig_exec_trans(self, transition_id)
+
+        discord.voice_state.VoiceConnectionState._execute_transition = _patched_exec_trans
+
+        _orig_recv_msg = discord.gateway.DiscordVoiceWebSocket.received_message
+
+        async def _patched_recv_msg(self, msg: dict) -> None:
+            op = msg.get('op')
+            data = msg.get('d')
+            state = self._connection
+            if state and state.dave_session and op == self.DAVE_PREPARE_TRANSITION and data:
+                try:
+                    state.dave_session.prepare_transition(data.get('transition_id', 0), data.get('protocol_version', state.dave_protocol_version))
+                    print(f"[DiscordService-DAVE] Prepared transition id {data.get('transition_id')} via Opcode 21 | ready={state.dave_session.ready}")
+                except Exception as e:
+                    pass
+            await _orig_recv_msg(self, msg)
+
+        discord.gateway.DiscordVoiceWebSocket.received_message = _patched_recv_msg
+        print(f"[DiscordService] DAVE protocol state-machine patch installed successfully.")
+    except Exception as patch_err:
+        print(f"[DiscordService] DAVE patch initialization notice: {patch_err}")
+
     print(f"[DiscordService] discord.py v{discord.__version__} initialized. Opus loaded: {discord.opus.is_loaded()}")
 except (ImportError, Exception) as e:
     discord = None
@@ -253,7 +359,7 @@ class DiscordService:
                 self.voice_client = await channel.connect(timeout=15.0, reconnect=True)
 
             # Ensure continuous polyphonic mixer is attached to the voice client
-            if self.voice_client and not self.voice_client.is_playing():
+            if self.voice_client and self.voice_client.is_connected() and not self.voice_client.is_playing():
                 def _on_mixer_err(err):
                     print(f"[DiscordService] Initial mixer player stopped! Error: {err}")
                 self.voice_client.play(self.mixer, after=_on_mixer_err)
@@ -269,8 +375,9 @@ class DiscordService:
             print(f"[DiscordService] Successfully connected voice client to '{channel.name}' in '{channel.guild.name}' (VoiceClient: {self.voice_client})")
             return True, f"Connected to {channel.name}"
         except Exception as e:
-            print(f"[DiscordService] Voice connection error: {e}")
-            return False, f"Voice connect failed: {e}"
+            err_msg = f"{type(e).__name__}: {e}" if str(e).strip() else type(e).__name__
+            print(f"[DiscordService] Voice connection error: {err_msg}")
+            return False, f"Voice connect failed: {err_msg}"
 
     async def _leave_internal(self):
         self.mixer.stop_all()

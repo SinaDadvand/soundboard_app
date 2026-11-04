@@ -5,7 +5,7 @@ FROM python:3.11-slim
 LABEL maintainer="Virtual Soundboard" \
       version="2.4-cloud-auth" \
       description="Virtual Soundboard Pro with Real-Time DSP, Discord Voice Streaming, and Firebase Auth"
-# Build trigger: 2026-11-04 Pin discord.py[voice]==2.6.4 to eliminate unencrypted DAVE protocol frame dropping
+# Build trigger: 2026-11-04 DAVE protocol state-machine patch with discord.py>=2.7.0 and davey
 
 # Set environment variables for Python and Cloud Run
 ENV PYTHONDONTWRITEBYTECODE=1 \
