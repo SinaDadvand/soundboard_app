@@ -39,51 +39,20 @@ except (ImportError, Exception):
     BasePCMAudio = object
 
 
-class DiscordMixerAudioSource(discord.AudioSource if DISCORD_AVAILABLE else object):
-    """Real-time Multi-Track Audio Mixer for Discord Voice.
-    Allows multiple sounds and multiple copies of the same sound to play simultaneously over each other.
-    """
-    def __init__(self):
-        self.tracks = []
-        self.lock = threading.Lock()
-
-    def add_track(self, raw_bytes: bytes):
-        with self.lock:
-            self.tracks.append(io.BytesIO(raw_bytes))
-
-    def stop_all(self):
-        with self.lock:
-            self.tracks.clear()
-
-    def is_playing_any(self):
-        with self.lock:
-            return len(self.tracks) > 0
+class DiscordAudioSource(discord.AudioSource if DISCORD_AVAILABLE else object):
+    """Custom PCM Audio Source from in-memory raw 16-bit 48kHz stereo bytes with proper frame padding."""
+    def __init__(self, raw_bytes):
+        self.stream = io.BytesIO(raw_bytes)
 
     def read(self):
-        # 3840 bytes = 20ms frame of 48,000Hz * 2 channels * 2 bytes/sample (16-bit PCM)
-        frame_bytes = 3840
-        num_samples = 1920
-
-        with self.lock:
-            if not self.tracks:
-                return b'\x00' * frame_bytes
-
-            mixed = np.zeros(num_samples, dtype=np.int32)
-            active_tracks = []
-
-            for stream in self.tracks:
-                chunk = stream.read(frame_bytes)
-                if len(chunk) > 0:
-                    if len(chunk) < frame_bytes:
-                        chunk = chunk + (b'\x00' * (frame_bytes - len(chunk)))
-                    samples = np.frombuffer(chunk, dtype=np.int16)
-                    mixed += samples
-                    if stream.tell() < stream.getbuffer().nbytes:
-                        active_tracks.append(stream)
-
-            self.tracks = active_tracks
-            mixed_clipped = np.clip(mixed, -32768, 32767).astype(np.int16)
-            return mixed_clipped.tobytes()
+        # 3840 bytes = exactly 20ms of 48,000Hz * 2 channels * 2 bytes/sample (16-bit PCM)
+        chunk = self.stream.read(3840)
+        if len(chunk) < 3840:
+            if len(chunk) == 0:
+                return b''
+            # Pad the trailing frame with silence so the sound doesn't get clipped
+            return chunk + (b'\x00' * (3840 - len(chunk)))
+        return chunk
 
     def is_opus(self):
         return False
@@ -97,7 +66,6 @@ class DiscordService:
         self.loop = None
         self.thread = None
         self.voice_client = None
-        self.mixer = DiscordMixerAudioSource()
         self.is_running = False
         self.is_connecting = False
         self.last_error = None
@@ -233,10 +201,6 @@ class DiscordService:
             else:
                 self.voice_client = await channel.connect(timeout=15.0, reconnect=True)
 
-            # Ensure continuous polyphonic mixer is attached to the voice client
-            if self.voice_client and not self.voice_client.is_playing():
-                self.voice_client.play(self.mixer)
-
             # Attempt to set distinguishable bot nickname in guild if configured
             bot_display_name = os.environ.get('BOT_NAME') or (f"Soundboard ({os.environ.get('USER_NAME').title()})" if os.environ.get('USER_NAME') else None)
             if bot_display_name and channel.guild and channel.guild.me:
@@ -252,9 +216,10 @@ class DiscordService:
             return False, f"Voice connect failed: {e}"
 
     async def _leave_internal(self):
-        self.mixer.stop_all()
         for vc in list(self.bot.voice_clients):
             try:
+                if vc.is_playing():
+                    vc.stop()
                 await vc.disconnect(force=True)
             except Exception:
                 pass
@@ -287,11 +252,22 @@ class DiscordService:
             return False, str(e)
 
     def stop_all_sounds(self):
-        """Stop all active audio streams in mixer immediately."""
-        self.mixer.stop_all()
+        """Stop all active audio in Discord voice immediately."""
+        if self.loop and self.bot:
+            async def _stop():
+                for vc in list(self.bot.voice_clients):
+                    try:
+                        if vc.is_playing():
+                            vc.stop()
+                    except Exception:
+                        pass
+            try:
+                asyncio.run_coroutine_threadsafe(_stop(), self.loop)
+            except Exception:
+                pass
 
     def play_audio_array(self, audio_data: np.ndarray, sr: int = 48000):
-        """Stream a float32 audio array to active Discord voice mixer (polyphonic)."""
+        """Stream a float32 audio array to active Discord voice channel."""
         if not self.is_running or not self.loop:
             print("[DiscordService] Play dropped: Bot is not running or gateway loop is inactive.")
             return False
@@ -307,9 +283,8 @@ class DiscordService:
                 print(f"[DiscordService] Play dropped: Bot is not connected to a voice channel! (voice_clients={len(self.bot.voice_clients) if self.bot else 0})")
                 return False
 
-            # Ensure mixer is attached
-            if not active_vc.is_playing():
-                active_vc.play(self.mixer)
+            if active_vc.is_playing():
+                active_vc.stop()
 
             # Resample to 48,000 Hz if needed (Discord standard sample rate)
             from scipy import signal
@@ -330,9 +305,9 @@ class DiscordService:
             pcm16 = np.ascontiguousarray(pcm16)
             raw_bytes = pcm16.tobytes()
 
-            # Add to mixer (allows overlapping sounds and repeated plays of the same sound)
-            self.mixer.add_track(raw_bytes)
-            print(f"[DiscordService] Transmitting sound to Discord voice channel '{active_vc.channel.name}' ({len(raw_bytes)} bytes PCM)")
+            source = DiscordAudioSource(raw_bytes)
+            active_vc.play(source)
+            print(f"[DiscordService] Started playing sound on voice channel '{active_vc.channel.name}' ({len(raw_bytes)} bytes PCM)")
             return True
 
         future = asyncio.run_coroutine_threadsafe(_play(), self.loop)
@@ -424,7 +399,6 @@ class DiscordService:
 
     def stop(self):
         """Disconnect and stop the bot."""
-        self.mixer.stop_all()
         if self.loop and self.bot:
             try:
                 asyncio.run_coroutine_threadsafe(self._leave_internal(), self.loop)
