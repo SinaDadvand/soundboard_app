@@ -475,6 +475,37 @@ def api_play_sound(sound_id):
     return jsonify({'status': 'error', 'message': 'Playback failed'}), 500
 
 
+@app.route('/api/discord/test_ffmpeg/<sound_id>', methods=['POST', 'GET'])
+@require_auth
+def api_test_ffmpeg(sound_id):
+    sound = config_manager.get_sound_by_id(sound_id)
+    if not sound:
+        for s in config_manager.config.get('sounds', []):
+            if s['filename'] == sound_id:
+                sound = s
+                break
+    if not sound:
+        return jsonify({'status': 'error', 'message': 'Sound not found'}), 404
+
+    filepath = os.path.join(AUDIO_FOLDER, sound['filename'])
+    if not os.path.exists(filepath):
+        sub = os.path.join(AUDIO_FOLDER, 'audio', sound['filename'])
+        if os.path.exists(sub):
+            filepath = sub
+        else:
+            parent = os.path.join(os.path.dirname(AUDIO_FOLDER), sound['filename'])
+            if os.path.exists(parent):
+                filepath = parent
+
+    success, msg = discord_service.play_file_direct(filepath)
+    return jsonify({
+        'status': 'success' if success else 'error',
+        'message': msg,
+        'sound_id': sound['id'],
+        'filepath': filepath
+    })
+
+
 @app.route('/api/stop', methods=['POST', 'GET'])
 @app.route('/api/panic', methods=['POST', 'GET'])
 @require_auth

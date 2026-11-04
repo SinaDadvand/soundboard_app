@@ -17,7 +17,11 @@ import soundfile as sf
 import numpy as np
 
 # Suppress overly verbose discord gateway logs
+# Enable voice logging for deep diagnostics
 logging.getLogger('discord').setLevel(logging.WARNING)
+logging.getLogger('discord.voice_client').setLevel(logging.DEBUG)
+logging.getLogger('discord.player').setLevel(logging.DEBUG)
+logging.getLogger('discord.voice_state').setLevel(logging.DEBUG)
 
 try:
     import discord
@@ -32,11 +36,13 @@ try:
                 break
             except Exception:
                 pass
-except (ImportError, Exception):
+    print(f"[DiscordService] discord.py v{discord.__version__} initialized. Opus loaded: {discord.opus.is_loaded()}")
+except (ImportError, Exception) as e:
     discord = None
     commands = None
     DISCORD_AVAILABLE = False
     BasePCMAudio = object
+    print(f"[DiscordService] Discord initialization notice: {e}")
 
 
 class DiscordMixerAudioSource(discord.AudioSource if DISCORD_AVAILABLE else object):
@@ -46,14 +52,17 @@ class DiscordMixerAudioSource(discord.AudioSource if DISCORD_AVAILABLE else obje
     def __init__(self):
         self.tracks = []
         self.lock = threading.Lock()
+        self._log_counter = 0
 
     def add_track(self, raw_bytes: bytes):
         with self.lock:
             self.tracks.append(io.BytesIO(raw_bytes))
+            print(f"[DiscordMixer] Added track ({len(raw_bytes)} bytes). Total active tracks: {len(self.tracks)}")
 
     def stop_all(self):
         with self.lock:
             self.tracks.clear()
+            print("[DiscordMixer] Stopped all tracks in mixer.")
 
     def is_playing_any(self):
         with self.lock:
@@ -81,8 +90,18 @@ class DiscordMixerAudioSource(discord.AudioSource if DISCORD_AVAILABLE else obje
                     if stream.tell() < stream.getbuffer().nbytes:
                         active_tracks.append(stream)
 
+            finished_count = len(self.tracks) - len(active_tracks)
             self.tracks = active_tracks
             mixed_clipped = np.clip(mixed, -32768, 32767).astype(np.int16)
+
+            self._log_counter += 1
+            if self._log_counter % 25 == 0:
+                peak = int(np.max(np.abs(mixed_clipped)))
+                print(f"[DiscordMixer] Streaming frame #{self._log_counter}: active_tracks={len(active_tracks)}, peak_sample={peak}")
+
+            if finished_count > 0:
+                print(f"[DiscordMixer] Track completed. Remaining tracks in mixer: {len(active_tracks)}")
+
             return mixed_clipped.tobytes()
 
     def is_opus(self):
@@ -235,7 +254,9 @@ class DiscordService:
 
             # Ensure continuous polyphonic mixer is attached to the voice client
             if self.voice_client and not self.voice_client.is_playing():
-                self.voice_client.play(self.mixer)
+                def _on_mixer_err(err):
+                    print(f"[DiscordService] Initial mixer player stopped! Error: {err}")
+                self.voice_client.play(self.mixer, after=_on_mixer_err)
 
             # Attempt to set distinguishable bot nickname in guild if configured
             bot_display_name = os.environ.get('BOT_NAME') or (f"Soundboard ({os.environ.get('USER_NAME').title()})" if os.environ.get('USER_NAME') else None)
@@ -309,9 +330,17 @@ class DiscordService:
                 print(f"[DiscordService] Play dropped: Bot is not connected to a voice channel! (voice_clients={len(self.bot.voice_clients) if self.bot else 0})")
                 return False
 
+            conn = getattr(active_vc, '_connection', None)
+            dave_ver = getattr(conn, 'dave_protocol_version', None) if conn else None
+            can_enc = getattr(conn, 'can_encrypt', None) if conn else None
+            print(f"[DiscordService] VC state: connected={active_vc.is_connected()}, playing={active_vc.is_playing()}, mode={getattr(active_vc, 'mode', None)}, ssrc={getattr(active_vc, 'ssrc', None)}, dave_ver={dave_ver}, can_encrypt={can_enc}")
+
             # Ensure continuous polyphonic mixer is attached
             if not active_vc.is_playing():
-                active_vc.play(self.mixer)
+                print("[DiscordService] VoiceClient was not playing! Re-attaching mixer...")
+                def _on_mixer_err(err):
+                    print(f"[DiscordService] Mixer player stopped! Error: {err}")
+                active_vc.play(self.mixer, after=_on_mixer_err)
 
             # Resample to 48,000 Hz if needed (Discord standard sample rate)
             from scipy import signal
@@ -343,6 +372,39 @@ class DiscordService:
         except Exception as e:
             print(f"[DiscordService] Playback error: {e}")
             return False
+
+    def play_file_direct(self, filepath):
+        """Play local file directly using discord.FFmpegPCMAudio to test raw Discord audio pipe."""
+        if not self.is_running or not self.loop or not os.path.exists(filepath):
+            return False, f"Not ready or file missing: {filepath}"
+
+        async def _direct_play():
+            active_vc = self.voice_client or (self.bot.voice_clients[0] if self.bot and self.bot.voice_clients else None)
+            if not active_vc or not active_vc.is_connected():
+                return False, "Not connected to a voice channel"
+
+            if active_vc.is_playing():
+                active_vc.stop()
+
+            conn = getattr(active_vc, '_connection', None)
+            dave_ver = getattr(conn, 'dave_protocol_version', None) if conn else None
+            can_enc = getattr(conn, 'can_encrypt', None) if conn else None
+            print(f"[DiscordService-Direct] Launching FFmpegPCMAudio for '{filepath}' | DAVE ver={dave_ver}, can_encrypt={can_enc}")
+
+            source = discord.FFmpegPCMAudio(filepath)
+            def _after(e):
+                print(f"[DiscordService-Direct] FFmpeg playback completed. Exception: {e}")
+                if active_vc.is_connected() and not active_vc.is_playing():
+                    active_vc.play(self.mixer)
+
+            active_vc.play(source, after=_after)
+            return True, "Started FFmpegPCMAudio playback"
+
+        future = asyncio.run_coroutine_threadsafe(_direct_play(), self.loop)
+        try:
+            return future.result(timeout=3)
+        except Exception as e:
+            return False, str(e)
 
     def get_status(self):
         """Return real-time Discord connection status."""

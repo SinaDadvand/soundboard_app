@@ -1002,6 +1002,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        const testDiscordFfmpegBtn = document.getElementById('test-discord-ffmpeg-btn');
+        if (testDiscordFfmpegBtn) {
+            testDiscordFfmpegBtn.addEventListener('click', async () => {
+                if (sounds.length > 0) {
+                    testDiscordFfmpegBtn.textContent = 'Testing...';
+                    try {
+                        const res = await apiFetch(`/api/discord/test_ffmpeg/${sounds[0].id}`, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            showToast(`Direct FFmpeg stream started on Discord!`, 'success');
+                        } else {
+                            showToast(`Discord direct play: ${data.message}`, 'error');
+                        }
+                    } catch (err) {
+                        showToast(`Network error: ${err}`, 'error');
+                    } finally {
+                        testDiscordFfmpegBtn.textContent = 'Direct Discord Play (FFmpeg)';
+                    }
+                } else {
+                    showToast('No sounds available to test', 'error');
+                }
+            });
+        }
+
         // Discord Bot Controls
         if (toggleDiscordBtn) {
             toggleDiscordBtn.addEventListener('click', async () => {
