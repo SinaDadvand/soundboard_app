@@ -245,6 +245,7 @@ class DiscordService:
                 except Exception:
                     pass
 
+            print(f"[DiscordService] Successfully connected voice client to '{channel.name}' in '{channel.guild.name}' (VoiceClient: {self.voice_client})")
             return True, f"Connected to {channel.name}"
         except Exception as e:
             print(f"[DiscordService] Voice connection error: {e}")
@@ -292,6 +293,7 @@ class DiscordService:
     def play_audio_array(self, audio_data: np.ndarray, sr: int = 48000):
         """Stream a float32 audio array to active Discord voice mixer (polyphonic)."""
         if not self.is_running or not self.loop:
+            print("[DiscordService] Play dropped: Bot is not running or gateway loop is inactive.")
             return False
 
         async def _play():
@@ -302,6 +304,7 @@ class DiscordService:
                 active_vc = self.bot.voice_clients[0]
 
             if not active_vc or not active_vc.is_connected():
+                print(f"[DiscordService] Play dropped: Bot is not connected to a voice channel! (voice_clients={len(self.bot.voice_clients) if self.bot else 0})")
                 return False
 
             # Ensure mixer is attached
@@ -329,6 +332,7 @@ class DiscordService:
 
             # Add to mixer (allows overlapping sounds and repeated plays of the same sound)
             self.mixer.add_track(raw_bytes)
+            print(f"[DiscordService] Transmitting sound to Discord voice channel '{active_vc.channel.name}' ({len(raw_bytes)} bytes PCM)")
             return True
 
         future = asyncio.run_coroutine_threadsafe(_play(), self.loop)
