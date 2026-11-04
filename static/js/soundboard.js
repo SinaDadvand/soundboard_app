@@ -971,14 +971,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         body: JSON.stringify({ channel_id: discordChannelSelect.value })
                     });
                     await pollDiscordStatus();
-
-        window.addEventListener('auth-state-ready', (e) => {
-            if (e.detail && e.detail.authorized) {
-                loadSounds();
-                loadDevices();
-            }
-        });
-
                 }
 
                 alert('Settings saved and connected!');
@@ -1021,14 +1013,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (status.voice_connected) {
                     await apiFetch('/api/discord/leave', { method: 'POST' });
                     await pollDiscordStatus();
-
-        window.addEventListener('auth-state-ready', (e) => {
-            if (e.detail && e.detail.authorized) {
-                loadSounds();
-                loadDevices();
-            }
-        });
-
                 } else {
                     settingsModal.classList.remove('hidden');
                 }
@@ -1050,14 +1034,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     saveDiscordTokenBtn.textContent = 'Connected!';
                     setTimeout(() => { saveDiscordTokenBtn.textContent = 'Connect'; }, 2000);
                     await pollDiscordStatus();
-
-        window.addEventListener('auth-state-ready', (e) => {
-            if (e.detail && e.detail.authorized) {
-                loadSounds();
-                loadDevices();
-            }
-        });
-
                 } catch (err) {
                     console.error('Discord config error:', err);
                     saveDiscordTokenBtn.textContent = 'Connect';
@@ -1083,14 +1059,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.status === 'success') {
                         discordJoinBtn.textContent = 'Connected';
                         await pollDiscordStatus();
-
-        window.addEventListener('auth-state-ready', (e) => {
-            if (e.detail && e.detail.authorized) {
-                loadSounds();
-                loadDevices();
-            }
-        });
-
                     } else {
                         alert(data.message || 'Failed to join voice channel');
                         discordJoinBtn.textContent = 'Join Voice';
