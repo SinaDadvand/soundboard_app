@@ -161,7 +161,11 @@ class DiscordService:
                 await self.bot.change_presence(activity=activity)
             except Exception as e:
                 print(f"[DiscordService] Could not set presence: {e}")
+            guild_list = [f"'{g.name}' (ID: {g.id})" for g in self.bot.guilds]
             print(f"[DiscordService] Logged in as {self.bot.user} (ID: {self.bot.user.id}) - Display: '{bot_display_name}'")
+            print(f"[DiscordService] Connected to {len(self.bot.guilds)} server(s): {guild_list}")
+            if len(self.bot.guilds) == 0:
+                print(f"[DiscordService] NOTICE: Bot is not currently in any Discord servers. Invite it using: https://discord.com/oauth2/authorize?client_id={self.bot.user.id}&permissions=3145728&scope=bot%20applications.commands")
             if self.default_channel_id:
                 try:
                     await self._join_channel_internal(int(self.default_channel_id))
@@ -215,7 +219,7 @@ class DiscordService:
 
     async def _join_channel_internal(self, channel_id):
         channel = self.bot.get_channel(int(channel_id))
-        if not channel or not isinstance(channel, discord.VoiceChannel):
+        if not channel or not isinstance(channel, (discord.VoiceChannel, discord.StageChannel)):
             return False, "Channel not found or not a voice channel"
 
         try:
@@ -343,8 +347,19 @@ class DiscordService:
         guild_name = None
         channel_id = None
         available_channels = []
+        guild_count = 0
+        guild_names = []
+        bot_user_id = None
+        invite_url = None
 
         if connected and self.bot:
+            if self.bot.user:
+                bot_user_id = str(self.bot.user.id)
+                invite_url = f"https://discord.com/oauth2/authorize?client_id={bot_user_id}&permissions=3145728&scope=bot%20applications.commands"
+
+            guild_count = len(self.bot.guilds)
+            guild_names = [g.name for g in self.bot.guilds]
+
             for vc in self.bot.voice_clients:
                 if vc.is_connected() and vc.channel:
                     voice_connected = True
@@ -354,13 +369,14 @@ class DiscordService:
                     break
 
             for guild in self.bot.guilds:
-                for ch in guild.voice_channels:
-                    available_channels.append({
-                        'id': str(ch.id),
-                        'name': f"{guild.name} ➔ #{ch.name}",
-                        'guild_id': str(guild.id),
-                        'guild_name': guild.name
-                    })
+                for ch in guild.channels:
+                    if isinstance(ch, (discord.VoiceChannel, discord.StageChannel)):
+                        available_channels.append({
+                            'id': str(ch.id),
+                            'name': f"{guild.name} ➔ #{ch.name}",
+                            'guild_id': str(guild.id),
+                            'guild_name': guild.name
+                        })
 
         return {
             'configured': configured,
@@ -368,6 +384,10 @@ class DiscordService:
             'is_connecting': self.is_connecting,
             'error': self.last_error,
             'user': str(self.bot.user) if (connected and self.bot and self.bot.user) else None,
+            'bot_user_id': bot_user_id,
+            'invite_url': invite_url,
+            'guild_count': guild_count,
+            'guild_names': guild_names,
             'voice_connected': voice_connected,
             'channel_name': channel_name,
             'guild_name': guild_name,

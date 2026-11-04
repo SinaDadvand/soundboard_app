@@ -184,6 +184,14 @@
                     <span>Add</span>
                 </button>
 
+                <!-- Resync Sounds Button -->
+                <button id="resync-sounds-btn" title="Rescan Cloud Storage / local folder for newly added sounds" class="flex items-center gap-1 bg-[#181d2a] hover:bg-[#22293b] border border-[#2b354d] hover:border-cyan-500/50 text-slate-200 hover:text-white font-semibold text-xs px-2.5 py-1.5 rounded-xl shadow-sm transition">
+                    <svg id="resync-spinner" class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span>Rescan</span>
+                </button>
+
                 <!-- Settings Gear -->
                 <button id="open-settings-modal-btn" title="Audio Device Configuration" class="p-1.5 rounded-xl bg-[#141824] border border-[#28334a] hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -337,6 +345,17 @@
                             </select>
                             <button id="discord-join-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition">Join Voice</button>
                         </div>
+                    </div>
+
+                    <!-- Direct Invite Link Notice if Bot is not in any server -->
+                    <div id="discord-invite-notice" class="hidden p-3 rounded-xl bg-purple-950/60 border border-purple-800/60 text-xs text-purple-200 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm">⚠️</span>
+                            <span>Bot is ready but not in your Discord server yet.</span>
+                        </div>
+                        <a id="discord-invite-btn" href="#" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold text-xs shadow-md whitespace-nowrap transition">
+                            Invite Bot ↗
+                        </a>
                     </div>
                 </div>
             </div>

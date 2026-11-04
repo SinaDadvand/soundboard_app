@@ -145,6 +145,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const sData = await sRes.json();
             sounds = sData.sounds || [];
 
+            // If sounds list is empty, attempt an auto-refresh in case GCS FUSE was mounting
+            if (sounds.length === 0) {
+                try {
+                    const rRes = await apiFetch('/api/sounds/refresh', { method: 'POST' });
+                    const rData = await rRes.json();
+                    if (rData && rData.sounds && rData.sounds.length > 0) {
+                        sounds = rData.sounds;
+                    }
+                } catch (rErr) {
+                    // Ignore fallback refresh error
+                }
+            }
+
             renderNumpadGrids();
         } catch (err) {
             console.error('Error loading sounds:', err);
@@ -900,6 +913,29 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         panicStopBtn.addEventListener('click', panicStopAll);
 
+        const resyncBtn = document.getElementById('resync-sounds-btn');
+        const resyncSpinner = document.getElementById('resync-spinner');
+        if (resyncBtn) {
+            resyncBtn.addEventListener('click', async () => {
+                try {
+                    if (resyncSpinner) resyncSpinner.classList.add('animate-spin');
+                    const res = await apiFetch('/api/sounds/refresh', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        sounds = data.sounds || [];
+                        renderNumpadGrids();
+                        showToast(`Rescan complete! Found ${sounds.length} sounds.`, 'success');
+                    } else {
+                        showToast(`Rescan failed: ${data.message || 'Unknown error'}`, 'error');
+                    }
+                } catch (err) {
+                    showToast('Rescan network error', 'error');
+                } finally {
+                    if (resyncSpinner) resyncSpinner.classList.remove('animate-spin');
+                }
+            });
+        }
+
         openSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
         openUploadBtn.addEventListener('click', () => uploadModal.classList.remove('hidden'));
 
@@ -1152,8 +1188,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         discordModalStatusBadge.textContent = `Connected (${st.guild_name} ➔ #${st.channel_name})`;
                         discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 font-medium border border-emerald-800/50';
                     } else if (st.connected) {
-                        discordModalStatusBadge.textContent = `Bot Ready (${st.user})`;
-                        discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 font-medium border border-purple-800/50';
+                        if (st.guild_count === 0) {
+                            discordModalStatusBadge.textContent = `Bot Ready (0 Servers)`;
+                            discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 font-medium border border-amber-800/50';
+                        } else {
+                            discordModalStatusBadge.textContent = `Bot Ready (${st.user})`;
+                            discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 font-medium border border-purple-800/50';
+                        }
                     } else if (st.error) {
                         discordModalStatusBadge.textContent = `Error: ${st.error}`;
                         discordModalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-red-950 text-red-300 font-medium border border-red-800/50';
@@ -1166,18 +1207,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                if (discordChannelSelect && st.available_channels && st.available_channels.length > 0) {
+                // Show Invite Link if Bot is not yet invited to any guild
+                const inviteContainer = document.getElementById('discord-invite-notice');
+                const inviteBtn = document.getElementById('discord-invite-btn');
+                if (inviteContainer && inviteBtn) {
+                    if (st.connected && st.guild_count === 0 && st.invite_url) {
+                        inviteBtn.href = st.invite_url;
+                        inviteContainer.classList.remove('hidden');
+                    } else {
+                        inviteContainer.classList.add('hidden');
+                    }
+                }
+
+                if (discordChannelSelect) {
                     const currentVal = discordChannelSelect.value;
-                    discordChannelSelect.innerHTML = '<option value="">Select Voice Channel...</option>';
-                    st.available_channels.forEach(ch => {
-                        const opt = document.createElement('option');
-                        opt.value = ch.id;
-                        opt.textContent = ch.name;
-                        if (ch.id === st.channel_id || ch.id === currentVal) {
-                            opt.selected = true;
+                    if (st.connected) {
+                        if (st.available_channels && st.available_channels.length > 0) {
+                            discordChannelSelect.innerHTML = '<option value="">Select Voice Channel...</option>';
+                            st.available_channels.forEach(ch => {
+                                const opt = document.createElement('option');
+                                opt.value = ch.id;
+                                opt.textContent = ch.name;
+                                if (ch.id === st.channel_id || ch.id === currentVal) {
+                                    opt.selected = true;
+                                }
+                                discordChannelSelect.appendChild(opt);
+                            });
+                        } else if (st.guild_count === 0) {
+                            discordChannelSelect.innerHTML = '<option value="">⚠️ Bot is not in any server! Invite it below.</option>';
+                        } else {
+                            discordChannelSelect.innerHTML = '<option value="">No voice channels found in server</option>';
                         }
-                        discordChannelSelect.appendChild(opt);
-                    });
+                    } else {
+                        discordChannelSelect.innerHTML = '<option value="">Select Voice Channel...</option>';
+                    }
                 }
             } catch (err) {
                 // Background poll ignore

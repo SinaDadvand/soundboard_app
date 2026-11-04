@@ -25,7 +25,7 @@ if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 from src.audio_engine import AudioEngine
-from src.config_manager import ConfigManager
+from src.config_manager import ConfigManager, resolve_audio_dir
 from src.hotkey_manager import HotkeyManager
 from src.discord_service import DiscordService
 from src.auth_service import auth_service, require_auth
@@ -78,11 +78,8 @@ else:
     CONFIG_PATH = os.environ.get('CONFIG_PATH') or os.path.join(BASE_DIR, 'soundboard_config.json')
 
     env_audio = os.environ.get('AUDIO_DIR')
-    if env_audio and os.path.exists(env_audio):
-        sub_audio = os.path.join(env_audio, 'audio')
-        AUDIO_FOLDER = sub_audio if os.path.exists(sub_audio) else env_audio
-    else:
-        AUDIO_FOLDER = env_audio or os.path.join(BASE_DIR, 'static', 'audio')
+    default_static = os.path.join(BASE_DIR, 'static', 'audio')
+    AUDIO_FOLDER = resolve_audio_dir(env_audio, default_static)
 
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 print(f"[Soundboard] Using Audio Folder: {AUDIO_FOLDER}")
@@ -141,6 +138,14 @@ def index():
 
 @app.route('/audio/<path:filename>')
 def serve_audio(filename):
+    if os.path.exists(os.path.join(AUDIO_FOLDER, filename)):
+        return send_from_directory(AUDIO_FOLDER, filename)
+    sub = os.path.join(AUDIO_FOLDER, 'audio')
+    if os.path.exists(os.path.join(sub, filename)):
+        return send_from_directory(sub, filename)
+    parent = os.path.dirname(AUDIO_FOLDER)
+    if os.path.exists(os.path.join(parent, filename)):
+        return send_from_directory(parent, filename)
     return send_from_directory(AUDIO_FOLDER, filename)
 
 
@@ -197,6 +202,9 @@ def api_auth_me():
 @app.route('/api/status', methods=['GET'])
 @require_auth
 def api_status():
+    if not config_manager.config.get('sounds'):
+        config_manager.sync_audio_files(config_manager.config)
+        config_manager.save_config()
     return jsonify({
         'status': 'ok',
         'master_volume': audio_engine.master_volume,
@@ -296,10 +304,28 @@ def api_set_devices():
 @app.route('/api/sounds', methods=['GET'])
 @require_auth
 def api_get_sounds():
+    if not config_manager.config.get('sounds'):
+        config_manager.sync_audio_files(config_manager.config)
+        config_manager.save_config()
+        hotkey_manager.reload_all_hotkeys()
     return jsonify({
         'sounds': config_manager.config.get('sounds', []),
         'master_volume': audio_engine.master_volume,
         'panic_key': config_manager.config.get('panic_key', 'esc')
+    })
+
+
+@app.route('/api/sounds/refresh', methods=['POST'])
+@require_auth
+def api_refresh_sounds():
+    config_manager.sync_audio_files(config_manager.config)
+    config_manager.save_config()
+    hotkey_manager.reload_all_hotkeys()
+    audio_engine.preload_directory()
+    return jsonify({
+        'status': 'success',
+        'sound_count': len(config_manager.config.get('sounds', [])),
+        'sounds': config_manager.config.get('sounds', [])
     })
 
 
@@ -405,6 +431,14 @@ def api_play_sound(sound_id):
         return jsonify({'status': 'error', 'message': 'Sound not found'}), 404
 
     filepath = os.path.join(AUDIO_FOLDER, sound['filename'])
+    if not os.path.exists(filepath):
+        sub = os.path.join(AUDIO_FOLDER, 'audio', sound['filename'])
+        if os.path.exists(sub):
+            filepath = sub
+        else:
+            parent = os.path.join(os.path.dirname(AUDIO_FOLDER), sound['filename'])
+            if os.path.exists(parent):
+                filepath = parent
 
     # Optional FX overrides from browser play
     data = request.get_json() if request.is_json else request.args

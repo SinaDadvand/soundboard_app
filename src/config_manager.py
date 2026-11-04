@@ -33,19 +33,46 @@ NUMPAD_KEY_ORDER = [
 ]
 
 
+def resolve_audio_dir(candidate_path, fallback_path=None):
+    """Smartly locate audio directory by checking where audio files actually exist."""
+    valid_exts = ('.mp3', '.wav', '.ogg', '.flac')
+    candidates = []
+    if candidate_path:
+        candidates.append(candidate_path)
+        candidates.append(os.path.join(candidate_path, 'audio'))
+        parent = os.path.dirname(candidate_path)
+        if parent and parent != candidate_path:
+            candidates.append(parent)
+    if fallback_path:
+        candidates.append(fallback_path)
+        candidates.append(os.path.join(fallback_path, 'audio'))
+
+    # Return the first candidate path containing audio files
+    for cand in candidates:
+        if cand and os.path.exists(cand):
+            try:
+                if any(f.lower().endswith(valid_exts) for f in os.listdir(cand)):
+                    return cand
+            except Exception:
+                pass
+
+    # Fallback to the first existing candidate directory
+    for cand in candidates:
+        if cand and os.path.exists(cand):
+            return cand
+
+    return candidate_path or fallback_path
+
+
 class ConfigManager:
     def __init__(self, config_path=None, audio_dir=None):
         curr_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(curr_dir)
 
         default_config = os.environ.get('CONFIG_PATH') or os.path.join(root_dir, 'soundboard_config.json')
-
         env_audio = os.environ.get('AUDIO_DIR')
-        if env_audio and os.path.exists(env_audio):
-            sub_audio = os.path.join(env_audio, 'audio')
-            default_audio = sub_audio if os.path.exists(sub_audio) else env_audio
-        else:
-            default_audio = env_audio or os.path.join(root_dir, 'static', 'audio')
+        static_audio = os.path.join(root_dir, 'static', 'audio')
+        default_audio = resolve_audio_dir(env_audio, static_audio)
 
         self.config_path = config_path or default_config
         self.audio_dir = audio_dir or default_audio
@@ -87,8 +114,12 @@ class ConfigManager:
     def sync_audio_files(self, config, force_reassign_hotkeys=True):
         """Ensure all audio files in the audio folder have structured numpad config entries.
         Files starting with numbers (e.g. 1_airhorn.mp3, 2_choppa.mp3) are sorted numerically ascending."""
+        self.audio_dir = resolve_audio_dir(self.audio_dir)
         valid_exts = ('.mp3', '.wav', '.ogg', '.flac')
-        existing_files = [f for f in os.listdir(self.audio_dir) if f.lower().endswith(valid_exts)]
+        if not os.path.exists(self.audio_dir):
+            existing_files = []
+        else:
+            existing_files = [f for f in os.listdir(self.audio_dir) if f.lower().endswith(valid_exts)]
 
         def natural_sort_key(filename):
             base = os.path.splitext(filename)[0]
