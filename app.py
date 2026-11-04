@@ -441,7 +441,7 @@ def api_play_sound(sound_id):
                 filepath = parent
 
     # Optional FX overrides from browser play
-    data = request.get_json() if request.is_json else request.args
+    data = (request.get_json(silent=True) or {}) if request.is_json else request.args
     volume = float(data.get('volume', sound.get('volume', 1.0)))
     speed = float(data.get('speed', sound.get('speed', 1.0)))
     pitch = float(data.get('pitch', sound.get('pitch', 0.0)))

@@ -1,11 +1,15 @@
 """
-Virtual Soundboard Launcher - Pro Edition 2.2
-=============================================
-Modern Tkinter desktop wrapper that supports:
-  1. Local Mode: Starts local Flask soundboard server & hooks local audio hardware.
-  2. Cloud Run Mode: Select environment (ADT, SPT, PRD, Custom), opens Cloud Run app
-     in browser, and runs the Windows Global Hotkey Companion in the background to
-     trigger remote playback directly while in games.
+Virtual Soundboard Launcher - Pro Edition 2.4 (Multi-User Cloud Run)
+====================================================================
+Modern Tkinter desktop companion for Windows that supports:
+  1. Cloud Run Mode:
+     - Select GCP Environment (ADT, SPT, PRD)
+     - Select Per-User Cloud Run Service (Sina, Cesar, Shared Base, or Custom)
+     - Launches Cloud Run web dashboard in default browser
+     - Runs background Windows Global Hotkey Companion to stream triggers directly
+       from fullscreen games (Numpad hotkeys + ESC panic stop)
+  2. Local Mode:
+     - Runs local Flask server & hooks local audio hardware
 """
 
 import sys
@@ -44,26 +48,96 @@ audio_candidates = [
 AUDIO_FOLDER = next((p for p in audio_candidates if os.path.exists(p) and len(os.listdir(p)) > 0), audio_candidates[0])
 LOCAL_SERVER_URL = 'http://127.0.0.1:5001'
 COMPANION_API_KEY = os.environ.get('COMPANION_API_KEY', 'soundboard-companion-key-2026')
+SETTINGS_FILE = os.path.join(_EXE_DIR, 'launcher_settings.json')
 
 ENVIRONMENTS = {
     'ADT': {
         'name': 'ADT (Non-Prod / Dev)',
-        'url': 'https://soundboard-app-fb-adt-454499904362.us-west1.run.app',
-        'badge': 'DEV'
+        'badge': 'DEV',
+        'default_service': 'sina',
+        'services': {
+            'sina': {
+                'label': '👤 Sina',
+                'description': 'Sina Personal Cloud Run',
+                'url': 'https://soundboard-user-sina-adt-454499904362.us-west1.run.app'
+            },
+            'cesar': {
+                'label': '👤 Cesar',
+                'description': 'Cesar Personal Cloud Run',
+                'url': 'https://soundboard-user-cesar-adt-454499904362.us-west1.run.app'
+            },
+            'shared': {
+                'label': '🌐 Shared Base',
+                'description': 'Shared Base App (ADT)',
+                'url': 'https://soundboard-app-fb-adt-454499904362.us-west1.run.app'
+            }
+        }
     },
     'SPT': {
         'name': 'SPT (Staging)',
-        'url': 'https://soundboard-app-spt-454499904362.us-west1.run.app',
-        'badge': 'STAGE'
+        'badge': 'STAGE',
+        'default_service': 'sina',
+        'services': {
+            'sina': {
+                'label': '👤 Sina',
+                'description': 'Sina Staging Cloud Run',
+                'url': 'https://soundboard-user-sina-spt-454499904362.us-west1.run.app'
+            },
+            'cesar': {
+                'label': '👤 Cesar',
+                'description': 'Cesar Staging Cloud Run',
+                'url': 'https://soundboard-user-cesar-spt-454499904362.us-west1.run.app'
+            },
+            'shared': {
+                'label': '🌐 Shared Base',
+                'description': 'Shared Base App (SPT)',
+                'url': 'https://soundboard-app-fb-spt-454499904362.us-west1.run.app'
+            }
+        }
     },
     'PRD': {
         'name': 'PRD (Production)',
-        'url': 'https://soundboard-app-prd-454499904362.us-west1.run.app',
-        'badge': 'PROD'
+        'badge': 'PROD',
+        'default_service': 'sina',
+        'services': {
+            'sina': {
+                'label': '👤 Sina',
+                'description': 'Sina Production Cloud Run',
+                'url': 'https://soundboard-user-sina-prd-454499904362.us-west1.run.app'
+            },
+            'cesar': {
+                'label': '👤 Cesar',
+                'description': 'Cesar Production Cloud Run',
+                'url': 'https://soundboard-user-cesar-prd-454499904362.us-west1.run.app'
+            },
+            'shared': {
+                'label': '🌐 Shared Base',
+                'description': 'Shared Base App (PRD)',
+                'url': 'https://soundboard-app-prd-454499904362.us-west1.run.app'
+            }
+        }
     }
 }
 
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
+
+
+def _load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _save_settings(settings):
+    try:
+        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(settings, f, indent=2)
+    except Exception:
+        pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,9 +194,9 @@ class CloudHotkeyCompanion:
             # Query Cloud Run for sound list & hotkey mappings
             req = urllib.request.Request(
                 f"{self.target_url}/api/sounds",
-                headers={'X-Companion-Key': COMPANION_API_KEY, 'User-Agent': 'SoundboardDesktopCompanion/2.2'}
+                headers={'X-Companion-Key': COMPANION_API_KEY, 'User-Agent': 'SoundboardDesktopCompanion/2.4'}
             )
-            
+
             with urllib.request.urlopen(req, timeout=6) as response:
                 data = json.loads(response.read().decode('utf-8'))
 
@@ -186,7 +260,7 @@ class CloudHotkeyCompanion:
                     headers={
                         'Content-Type': 'application/json',
                         'X-Companion-Key': COMPANION_API_KEY,
-                        'User-Agent': 'SoundboardDesktopCompanion/2.2'
+                        'User-Agent': 'SoundboardDesktopCompanion/2.4'
                     },
                     method='POST'
                 )
@@ -207,7 +281,7 @@ class CloudHotkeyCompanion:
                     headers={
                         'Content-Type': 'application/json',
                         'X-Companion-Key': COMPANION_API_KEY,
-                        'User-Agent': 'SoundboardDesktopCompanion/2.2'
+                        'User-Agent': 'SoundboardDesktopCompanion/2.4'
                     },
                     method='POST'
                 )
@@ -237,8 +311,8 @@ class SoundboardLauncher(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title('Virtual Soundboard Pro 2.2')
-        self.geometry('480x490')
+        self.title('Virtual Soundboard Pro 2.4')
+        self.geometry('500x560')
         self.resizable(False, False)
         self.configure(bg=self.C_BG)
         self.protocol('WM_DELETE_WINDOW', self._quit)
@@ -247,6 +321,8 @@ class SoundboardLauncher(tk.Tk):
         icon_candidates = [
             os.path.join(_EXE_DIR, 'app_icon.ico'),
             os.path.join(_BUNDLE, 'app_icon.ico'),
+            os.path.join(_EXE_DIR, 'assets', 'app_icon.ico'),
+            os.path.join(_BUNDLE, 'assets', 'app_icon.ico'),
             os.path.join(_EXE_DIR, 'static', 'favicon.ico')
         ]
         for icon_path in icon_candidates:
@@ -257,14 +333,25 @@ class SoundboardLauncher(tk.Tk):
                 except Exception:
                     pass
 
+        # Load saved user settings
+        saved = _load_settings()
+        init_env = saved.get('selected_env', 'ADT')
+        if init_env not in ENVIRONMENTS:
+            init_env = 'ADT'
+        init_service = saved.get('selected_service', 'sina')
+        if init_service not in ENVIRONMENTS[init_env]['services'] and init_service != 'custom':
+            init_service = 'sina'
+
         self.current_mode = tk.StringVar(value='cloud') # 'local' or 'cloud'
-        self.selected_env = tk.StringVar(value='ADT')
-        self.custom_url_var = tk.StringVar(value=ENVIRONMENTS['ADT']['url'])
+        self.selected_env = tk.StringVar(value=init_env)
+        self.selected_service = tk.StringVar(value=init_service)
+        self.custom_url_var = tk.StringVar(value='')
+
         self.cloud_companion = None
         self.local_server_started = False
 
         self._build_ui()
-        self._on_env_changed()
+        self._sync_url_and_ui()
 
     def _build_ui(self):
         container = tk.Frame(self, bg=self.C_SURFACE, highlightbackground=self.C_BORDER, highlightthickness=1)
@@ -281,7 +368,7 @@ class SoundboardLauncher(tk.Tk):
                  font=('Segoe UI', 14, 'bold'),
                  fg=self.C_TEXT, bg=self.C_SURFACE).pack(side='left')
 
-        badge = tk.Label(title_frame, text=' V2.2 ',
+        badge = tk.Label(title_frame, text=' V2.4 Cloud ',
                          font=('Segoe UI', 8, 'bold'),
                          fg=self.C_GOLD, bg='#241c09',
                          highlightbackground='#5a440c', highlightthickness=1)
@@ -318,12 +405,12 @@ class SoundboardLauncher(tk.Tk):
         self._cloud_frame = tk.Frame(container, bg=self.C_SURFACE)
         self._cloud_frame.pack(fill='x', padx=16, pady=(0, 10))
 
-        tk.Label(self._cloud_frame, text='Select Target Cloud Run Environment:',
-                 font=('Segoe UI', 9, 'bold'), fg=self.C_TEXT, bg=self.C_SURFACE).pack(anchor='w', pady=(0, 6))
+        # ── Step 1: Environment Selection ──────────────────────────────────────
+        tk.Label(self._cloud_frame, text='1. Select Environment:',
+                 font=('Segoe UI', 9, 'bold'), fg=self.C_TEXT, bg=self.C_SURFACE).pack(anchor='w', pady=(0, 4))
 
-        # Environment Selector Buttons
         env_btn_box = tk.Frame(self._cloud_frame, bg=self.C_SURFACE)
-        env_btn_box.pack(fill='x', pady=(0, 8))
+        env_btn_box.pack(fill='x', pady=(0, 10))
 
         self._env_buttons = {}
         for code, info in ENVIRONMENTS.items():
@@ -339,17 +426,26 @@ class SoundboardLauncher(tk.Tk):
             btn.pack(side='left', fill='x', expand=True, padx=2)
             self._env_buttons[code] = btn
 
-        # URL Field
+        # ── Step 2: Per-User Cloud Run Service Selection ───────────────────────
+        tk.Label(self._cloud_frame, text='2. Select Cloud Run Instance (Per-User):',
+                 font=('Segoe UI', 9, 'bold'), fg=self.C_TEXT, bg=self.C_SURFACE).pack(anchor='w', pady=(0, 4))
+
+        self._service_btn_box = tk.Frame(self._cloud_frame, bg=self.C_SURFACE)
+        self._service_btn_box.pack(fill='x', pady=(0, 10))
+        self._service_buttons = {}
+
+        # ── Step 3: Target URL Field ──────────────────────────────────────────
         url_box = tk.Frame(self._cloud_frame, bg=self.C_SURFACE)
         url_box.pack(fill='x', pady=(0, 4))
 
-        tk.Label(url_box, text='Target URL:', font=('Segoe UI', 8), fg=self.C_MUTED, bg=self.C_SURFACE).pack(anchor='w')
+        tk.Label(url_box, text='Target Endpoint URL:', font=('Segoe UI', 8), fg=self.C_MUTED, bg=self.C_SURFACE).pack(anchor='w')
         self._url_entry = tk.Entry(
             url_box, textvariable=self.custom_url_var,
             font=('Segoe UI', 8), bg='#0b0d13', fg='#38bdf8',
             insertbackground='#38bdf8', highlightbackground=self.C_BORDER, highlightthickness=1, bd=0
         )
         self._url_entry.pack(fill='x', pady=(2, 0), ipady=4)
+        self._url_entry.bind('<KeyRelease>', lambda e: self._on_url_typed())
 
         # Status Pill Box
         status_box = tk.Frame(container, bg='#0e111a', highlightbackground=self.C_BORDER, highlightthickness=1)
@@ -383,7 +479,7 @@ class SoundboardLauncher(tk.Tk):
         )
         self._main_btn.pack(fill='x', pady=(0, 6))
 
-        # Secondary Button Box (Sync Hotkeys & Audio Folder)
+        # Secondary Button Box (Sync Hotkeys, Open Web UI & Audio Folder)
         sec_btn_box = tk.Frame(btn_box, bg=self.C_SURFACE)
         sec_btn_box.pack(fill='x')
 
@@ -395,7 +491,17 @@ class SoundboardLauncher(tk.Tk):
             font=('Segoe UI', 9, 'bold'),
             relief='flat', bd=0, pady=6, cursor='hand2'
         )
-        self._sync_btn.pack(side='left', fill='x', expand=True, padx=(0, 3))
+        self._sync_btn.pack(side='left', fill='x', expand=True, padx=(0, 2))
+
+        self._browser_btn = tk.Button(
+            sec_btn_box, text='🌐  Open Web UI',
+            command=self._open_web_ui,
+            bg=self.C_KEYCAP, fg=self.C_TEXT,
+            activebackground=self.C_KEYCAP_HOVER, activeforeground='#ffffff',
+            font=('Segoe UI', 9, 'bold'),
+            relief='flat', bd=0, pady=6, cursor='hand2'
+        )
+        self._browser_btn.pack(side='left', fill='x', expand=True, padx=2)
 
         self._folder_btn = tk.Button(
             sec_btn_box, text='📁  Audio Folder',
@@ -405,7 +511,7 @@ class SoundboardLauncher(tk.Tk):
             font=('Segoe UI', 9, 'bold'),
             relief='flat', bd=0, pady=6, cursor='hand2'
         )
-        self._folder_btn.pack(side='right', fill='x', expand=True, padx=(3, 0))
+        self._folder_btn.pack(side='right', fill='x', expand=True, padx=(2, 0))
 
         # Footer Notice
         self._footer_lbl = tk.Label(
@@ -415,6 +521,107 @@ class SoundboardLauncher(tk.Tk):
         )
         self._footer_lbl.pack(side='bottom', pady=(0, 8))
 
+    def _sync_url_and_ui(self):
+        curr_env = self.selected_env.get()
+        curr_srv = self.selected_service.get()
+
+        # Update environment button styles
+        for code, btn in self._env_buttons.items():
+            if code == curr_env:
+                btn.config(bg=self.C_CYAN, fg='#ffffff')
+            else:
+                btn.config(bg=self.C_KEYCAP, fg=self.C_MUTED)
+
+        # Rebuild / update service buttons for selected environment
+        for widget in self._service_btn_box.winfo_children():
+            widget.destroy()
+        self._service_buttons.clear()
+
+        env_info = ENVIRONMENTS.get(curr_env, ENVIRONMENTS['ADT'])
+        service_defs = env_info['services']
+
+        for s_code, s_data in service_defs.items():
+            is_active = (curr_srv == s_code)
+            btn = tk.Button(
+                self._service_btn_box,
+                text=s_data['label'],
+                command=lambda sc=s_code: self._select_service(sc),
+                font=('Segoe UI', 9, 'bold'),
+                bg=self.C_CYAN if is_active else self.C_KEYCAP,
+                fg='#ffffff' if is_active else self.C_MUTED,
+                activebackground=self.C_CYAN_HOVER if is_active else self.C_KEYCAP_HOVER,
+                activeforeground='#ffffff' if is_active else self.C_TEXT,
+                relief='flat', bd=0, pady=6, cursor='hand2'
+            )
+            btn.pack(side='left', fill='x', expand=True, padx=2)
+            self._service_buttons[s_code] = btn
+
+        # Custom service button
+        is_custom = (curr_srv == 'custom')
+        cust_btn = tk.Button(
+            self._service_btn_box,
+            text='⚙️ Custom',
+            command=lambda: self._select_service('custom'),
+            font=('Segoe UI', 9, 'bold'),
+            bg=self.C_CYAN if is_custom else self.C_KEYCAP,
+            fg='#ffffff' if is_custom else self.C_MUTED,
+            activebackground=self.C_CYAN_HOVER if is_custom else self.C_KEYCAP_HOVER,
+            activeforeground='#ffffff' if is_custom else self.C_TEXT,
+            relief='flat', bd=0, pady=6, cursor='hand2'
+        )
+        cust_btn.pack(side='left', fill='x', expand=True, padx=2)
+        self._service_buttons['custom'] = cust_btn
+
+        # Update Target URL value
+        if curr_srv in service_defs:
+            self.custom_url_var.set(service_defs[curr_srv]['url'])
+
+        # Save active choice to settings
+        _save_settings({
+            'selected_env': curr_env,
+            'selected_service': curr_srv,
+            'custom_url': self.custom_url_var.get()
+        })
+
+    def _select_env(self, env_code):
+        self.selected_env.set(env_code)
+        # Keep same service code if it exists in new env, else fallback to env's default
+        curr_srv = self.selected_service.get()
+        env_services = ENVIRONMENTS[env_code]['services']
+        if curr_srv not in env_services and curr_srv != 'custom':
+            self.selected_service.set(ENVIRONMENTS[env_code]['default_service'])
+        self._sync_url_and_ui()
+
+    def _select_service(self, service_code):
+        self.selected_service.set(service_code)
+        self._sync_url_and_ui()
+
+    def _on_url_typed(self):
+        # If user manually types a URL that doesn't match predefined, mark as custom
+        url = self.custom_url_var.get().strip()
+        curr_env = self.selected_env.get()
+        env_services = ENVIRONMENTS.get(curr_env, {}).get('services', {})
+        matched = False
+        for s_code, s_data in env_services.items():
+            if url == s_data['url']:
+                self.selected_service.set(s_code)
+                matched = True
+                break
+        if not matched:
+            self.selected_service.set('custom')
+
+        for sc, btn in self._service_buttons.items():
+            if sc == self.selected_service.get():
+                btn.config(bg=self.C_CYAN, fg='#ffffff')
+            else:
+                btn.config(bg=self.C_KEYCAP, fg=self.C_MUTED)
+
+        _save_settings({
+            'selected_env': curr_env,
+            'selected_service': self.selected_service.get(),
+            'custom_url': url
+        })
+
     def _set_mode(self, mode):
         self.current_mode.set(mode)
         if mode == 'cloud':
@@ -422,35 +629,19 @@ class SoundboardLauncher(tk.Tk):
             self._local_tab_btn.config(bg='#181d2a', fg=self.C_MUTED)
             self._cloud_frame.pack(fill='x', padx=16, pady=(0, 10))
             self._main_btn.config(text='⚡   Launch Cloud Soundboard & Start Hotkeys')
-            self._sync_btn.pack(side='left', fill='x', expand=True, padx=(0, 3))
+            self._sync_btn.pack(side='left', fill='x', expand=True, padx=(0, 2))
+            self._browser_btn.pack(side='left', fill='x', expand=True, padx=2)
             self._footer_lbl.config(text='Global in-game hotkeys active while this launcher runs.')
-            self._on_env_changed()
+            self._sync_url_and_ui()
         else:
             self._local_tab_btn.config(bg=self.C_CYAN, fg='#ffffff')
             self._cloud_tab_btn.config(bg='#181d2a', fg=self.C_MUTED)
             self._cloud_frame.pack_forget()
             self._main_btn.config(text='🌐   Launch Local Web Dashboard (127.0.0.1:5001)')
             self._sync_btn.pack_forget()
+            self._browser_btn.pack_forget()
             self._footer_lbl.config(text='Local audio engine & Discord server run on your PC.')
             self._start_local_mode_server()
-
-    def _select_env(self, env_code):
-        self.selected_env.set(env_code)
-        if env_code in ENVIRONMENTS:
-            self.custom_url_var.set(ENVIRONMENTS[env_code]['url'])
-        self._on_env_changed()
-
-    def _on_env_changed(self):
-        curr_env = self.selected_env.get()
-        for code, btn in self._env_buttons.items():
-            if code == curr_env:
-                btn.config(bg=self.C_CYAN, fg='#ffffff')
-            else:
-                btn.config(bg=self.C_KEYCAP, fg=self.C_MUTED)
-
-        if self.cloud_companion and self.cloud_companion.is_active:
-            self._status_lbl.config(text=f"Connected to {curr_env}", fg=self.C_GREEN)
-            self._dot.config(fg=self.C_GREEN)
 
     def _launch_current_mode(self):
         mode = self.current_mode.get()
@@ -463,7 +654,9 @@ class SoundboardLauncher(tk.Tk):
             webbrowser.open(target_url)
 
             # Start Cloud Hotkey Companion in background
-            self._status_lbl.config(text=f"Connecting to {self.selected_env.get()}…", fg=self.C_MUTED)
+            env = self.selected_env.get()
+            srv = self.selected_service.get().title()
+            self._status_lbl.config(text=f"Connecting to {env} · {srv}…", fg=self.C_MUTED)
             self._dot.config(fg=self.C_GOLD)
 
             def _connect():
@@ -478,6 +671,11 @@ class SoundboardLauncher(tk.Tk):
         else:
             self._start_local_mode_server()
             webbrowser.open(LOCAL_SERVER_URL)
+
+    def _open_web_ui(self):
+        target_url = self.custom_url_var.get().strip()
+        if target_url:
+            webbrowser.open(target_url)
 
     def _start_local_mode_server(self):
         if not self.local_server_started:
@@ -520,7 +718,11 @@ class SoundboardLauncher(tk.Tk):
 
     def _open_folder(self):
         os.makedirs(AUDIO_FOLDER, exist_ok=True)
-        os.startfile(AUDIO_FOLDER)
+        if hasattr(os, 'startfile'):
+            os.startfile(AUDIO_FOLDER)
+        else:
+            import subprocess
+            subprocess.Popen(['xdg-open', AUDIO_FOLDER])
 
     def _quit(self):
         if self.cloud_companion:
