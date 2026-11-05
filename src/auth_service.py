@@ -99,9 +99,11 @@ class AuthService:
             ''
         )
         project_id = (
+            os.environ.get('FIREBASE_PROJECT_ID') or
             self.project_id or 
             os.environ.get('GCP_PROJECT') or 
             os.environ.get('GOOGLE_CLOUD_PROJECT') or 
+            (os.environ.get('FIREBASE_AUTH_DOMAIN', '').replace('.firebaseapp.com', '') if os.environ.get('FIREBASE_AUTH_DOMAIN') else '') or
             'p-np-adt-de'
         )
         auth_domain = (

@@ -138,7 +138,27 @@ try:
             await _orig_recv_msg(self, msg)
 
         discord.gateway.DiscordVoiceWebSocket.received_message = _patched_recv_msg
-        print(f"[DiscordService] DAVE protocol state-machine patch installed successfully.")
+
+        # Always stream raw Opus in standard voice RTP packets (aead_xchacha20_poly1305_rtpsize).
+        # DAVE gateway negotiation satisfies Discord's protocol handshake (preventing Close Code 4017),
+        # while standard voice encryption guarantees all channel listeners can decode and hear the bot's
+        # audio without MLS decryption failures or 'Failed to encrypt: NotReady' player thread crashes.
+        discord.voice_state.VoiceConnectionState.can_encrypt = property(lambda self: False)
+
+        def _safe_get_voice_packet(self, data: bytes):
+            header = bytearray(12)
+            header[0] = 0x80
+            header[1] = 0x78
+            struct.pack_into('>H', header, 2, self.sequence)
+            struct.pack_into('>I', header, 4, self.timestamp)
+            struct.pack_into('>I', header, 8, self.ssrc)
+
+            encrypt_packet = getattr(self, '_encrypt_' + self.mode)
+            return encrypt_packet(header, data)
+
+        discord.voice_client.VoiceClient._get_voice_packet = _safe_get_voice_packet
+
+        print(f"[DiscordService] DAVE protocol state-machine patch and safe RTP streamer installed successfully.")
     except Exception as patch_err:
         print(f"[DiscordService] DAVE patch initialization notice: {patch_err}")
 
