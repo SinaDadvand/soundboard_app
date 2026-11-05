@@ -39,6 +39,12 @@ class AuthService:
             for email in raw_allowed.split(',')
             if email.strip()
         )
+
+        # Always ensure primary admin email (sina.dadvand@gmail.com) has access across all user apps
+        admin_email = os.environ.get('ADMIN_EMAIL', 'sina.dadvand@gmail.com').strip().lower()
+        if admin_email and self.allowed_users:
+            self.allowed_users.add(admin_email)
+
         logger.info(f"[AuthService] Initialized with {len(self.allowed_users)} authorized email(s).")
 
         self.allowed_group = None
