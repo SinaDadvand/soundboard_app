@@ -58,24 +58,18 @@ try:
             if state.dave_session is not None:
                 if op == self.MLS_PROPOSALS:
                     optype = msg[3]
-                    result = state.dave_session.process_proposals(
-                        davey.ProposalsOperationType.append if optype == 0 else davey.ProposalsOperationType.revoke, msg[4:]
-                    )
-                    if isinstance(result, davey.CommitWelcome):
-                        await self.send_binary(
-                            discord.gateway.DiscordVoiceWebSocket.MLS_COMMIT_WELCOME,
-                            result.commit + result.welcome if result.welcome else result.commit,
+                    try:
+                        result = state.dave_session.process_proposals(
+                            davey.ProposalsOperationType.append if optype == 0 else davey.ProposalsOperationType.revoke, msg[4:]
                         )
-                        try:
-                            state.dave_session.process_commit(result.commit)
-                            state.dave_session.prepare_transition(0, state.dave_protocol_version)
-                            try:
-                                state.dave_session.execute_transition(0)
-                            except Exception:
-                                pass
-                            print(f"[DiscordService-DAVE] Own commit processed & transition 0 ready | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
-                        except Exception as ce:
-                            print(f"[DiscordService-DAVE] Own commit processing notice: {ce}")
+                        if isinstance(result, davey.CommitWelcome):
+                            await self.send_binary(
+                                discord.gateway.DiscordVoiceWebSocket.MLS_COMMIT_WELCOME,
+                                result.commit + result.welcome if result.welcome else result.commit,
+                            )
+                            print(f"[DiscordService-DAVE] Generated and sent MLS commit & welcome to Discord gateway")
+                    except Exception as pe:
+                        print(f"[DiscordService-DAVE] Proposals processing notice: {pe}")
                     return
 
                 elif op == self.MLS_ANNOUNCE_COMMIT_TRANSITION:
@@ -84,8 +78,8 @@ try:
                         state.dave_session.process_commit(msg[5:])
                         try:
                             state.dave_session.prepare_transition(transition_id, state.dave_protocol_version)
-                        except Exception:
-                            pass
+                        except Exception as pe:
+                            print(f"[DiscordService-DAVE] Prepare transition notice for id {transition_id}: {pe}")
                         if transition_id != 0:
                             state.dave_pending_transitions[transition_id] = state.dave_protocol_version
                             await self.send_transition_ready(transition_id)
@@ -95,7 +89,8 @@ try:
                             except Exception:
                                 pass
                         print(f"[DiscordService-DAVE] MLS commit transition {transition_id} processed | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
-                    except Exception:
+                    except Exception as ce:
+                        print(f"[DiscordService-DAVE] Commit transition {transition_id} error: {ce}")
                         await state._recover_from_invalid_commit(transition_id)
                     return
 
@@ -105,8 +100,8 @@ try:
                         state.dave_session.process_welcome(msg[5:])
                         try:
                             state.dave_session.prepare_transition(transition_id, state.dave_protocol_version)
-                        except Exception:
-                            pass
+                        except Exception as pe:
+                            print(f"[DiscordService-DAVE] Prepare transition notice for id {transition_id}: {pe}")
                         if transition_id != 0:
                             state.dave_pending_transitions[transition_id] = state.dave_protocol_version
                             await self.send_transition_ready(transition_id)
@@ -116,7 +111,8 @@ try:
                             except Exception:
                                 pass
                         print(f"[DiscordService-DAVE] MLS welcome transition {transition_id} processed | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
-                    except Exception:
+                    except Exception as we:
+                        print(f"[DiscordService-DAVE] Welcome transition {transition_id} error: {we}")
                         await state._recover_from_invalid_commit(transition_id)
                     return
 
