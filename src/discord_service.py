@@ -69,7 +69,11 @@ try:
                         try:
                             state.dave_session.process_commit(result.commit)
                             state.dave_session.prepare_transition(0, state.dave_protocol_version)
-                            print(f"[DiscordService-DAVE] Own commit processed & prepared transition 0 | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
+                            try:
+                                state.dave_session.execute_transition(0)
+                            except Exception:
+                                pass
+                            print(f"[DiscordService-DAVE] Own commit processed & transition 0 ready | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
                         except Exception as ce:
                             print(f"[DiscordService-DAVE] Own commit processing notice: {ce}")
                     return
@@ -85,6 +89,11 @@ try:
                         if transition_id != 0:
                             state.dave_pending_transitions[transition_id] = state.dave_protocol_version
                             await self.send_transition_ready(transition_id)
+                        else:
+                            try:
+                                state.dave_session.execute_transition(0)
+                            except Exception:
+                                pass
                         print(f"[DiscordService-DAVE] MLS commit transition {transition_id} processed | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
                     except Exception:
                         await state._recover_from_invalid_commit(transition_id)
@@ -101,6 +110,11 @@ try:
                         if transition_id != 0:
                             state.dave_pending_transitions[transition_id] = state.dave_protocol_version
                             await self.send_transition_ready(transition_id)
+                        else:
+                            try:
+                                state.dave_session.execute_transition(0)
+                            except Exception:
+                                pass
                         print(f"[DiscordService-DAVE] MLS welcome transition {transition_id} processed | ready={state.dave_session.ready}, can_encrypt={state.can_encrypt}")
                     except Exception:
                         await state._recover_from_invalid_commit(transition_id)
@@ -131,21 +145,47 @@ try:
             state = self._connection
             if state and state.dave_session and op == self.DAVE_PREPARE_TRANSITION and data:
                 try:
-                    state.dave_session.prepare_transition(data.get('transition_id', 0), data.get('protocol_version', state.dave_protocol_version))
-                    print(f"[DiscordService-DAVE] Prepared transition id {data.get('transition_id')} via Opcode 21 | ready={state.dave_session.ready}")
+                    trans_id = data.get('transition_id', 0)
+                    proto_ver = data.get('protocol_version', state.dave_protocol_version)
+                    state.dave_session.prepare_transition(trans_id, proto_ver)
+                    print(f"[DiscordService-DAVE] Prepared transition id {trans_id} via Opcode 21 | ready={state.dave_session.ready}")
+                    if trans_id == 0:
+                        try:
+                            state.dave_session.execute_transition(0)
+                        except Exception:
+                            pass
                 except Exception as e:
                     pass
             await _orig_recv_msg(self, msg)
 
         discord.gateway.DiscordVoiceWebSocket.received_message = _patched_recv_msg
 
-        # Always stream raw Opus in standard voice RTP packets (aead_xchacha20_poly1305_rtpsize).
-        # DAVE gateway negotiation satisfies Discord's protocol handshake (preventing Close Code 4017),
-        # while standard voice encryption guarantees all channel listeners can decode and hear the bot's
-        # audio without MLS decryption failures or 'Failed to encrypt: NotReady' player thread crashes.
-        discord.voice_state.VoiceConnectionState.can_encrypt = property(lambda self: False)
+        # Property to accurately reflect DAVE encryption readiness:
+        # Returns True only when DAVE is enabled (protocol > 0), dave_session exists, and session is ready/can_encrypt.
+        @property
+        def _safe_can_encrypt(self) -> bool:
+            if self.dave_protocol_version == 0 or self.dave_session is None:
+                return False
+            return bool(getattr(self.dave_session, 'can_encrypt', False) and self.dave_session.ready)
+
+        discord.voice_state.VoiceConnectionState.can_encrypt = _safe_can_encrypt
 
         def _safe_get_voice_packet(self, data: bytes):
+            packet = data
+            conn = self._connection
+            if conn and conn.dave_protocol_version > 0 and conn.dave_session is not None:
+                if conn.can_encrypt:
+                    try:
+                        packet = conn.dave_session.encrypt_opus(data)
+                    except Exception:
+                        # Caught during MLS key ratchet / transitions:
+                        # Drop this frame instead of throwing an error into AudioPlayer.
+                        return None
+                else:
+                    # DAVE is negotiated but transition hasn't executed yet.
+                    # Drop silence frames during handshake so Discord doesn't receive unencrypted payloads.
+                    return None
+
             header = bytearray(12)
             header[0] = 0x80
             header[1] = 0x78
@@ -154,11 +194,30 @@ try:
             struct.pack_into('>I', header, 8, self.ssrc)
 
             encrypt_packet = getattr(self, '_encrypt_' + self.mode)
-            return encrypt_packet(header, data)
+            return encrypt_packet(header, packet)
 
         discord.voice_client.VoiceClient._get_voice_packet = _safe_get_voice_packet
 
-        print(f"[DiscordService] DAVE protocol state-machine patch and safe RTP streamer installed successfully.")
+        def _safe_send_audio_packet(self, data: bytes, *, encode: bool = True) -> None:
+            self.checked_add('sequence', 1, 65535)
+            if encode:
+                encoded_data = self.encoder.encode(data, self.encoder.SAMPLES_PER_FRAME)
+            else:
+                encoded_data = data
+
+            try:
+                packet = self._get_voice_packet(encoded_data)
+                if packet is not None:
+                    self._connection.send_packet(packet)
+            except Exception:
+                # Catch any unexpected transport/encryption error to guarantee AudioPlayer thread never dies
+                pass
+
+            self.checked_add('timestamp', discord.opus.Encoder.SAMPLES_PER_FRAME, 4294967295)
+
+        discord.voice_client.VoiceClient.send_audio_packet = _safe_send_audio_packet
+
+        print(f"[DiscordService] DAVE protocol state-machine patch and resilient RTP streamer installed successfully.")
     except Exception as patch_err:
         print(f"[DiscordService] DAVE patch initialization notice: {patch_err}")
 
@@ -381,8 +440,12 @@ class DiscordService:
             # Ensure continuous polyphonic mixer is attached to the voice client
             if self.voice_client and self.voice_client.is_connected() and not self.voice_client.is_playing():
                 def _on_mixer_err(err):
-                    print(f"[DiscordService] Initial mixer player stopped! Error: {err}")
-                self.voice_client.play(self.mixer, after=_on_mixer_err)
+                    if err:
+                        print(f"[DiscordService] Initial mixer player stopped! Error: {err}")
+                try:
+                    self.voice_client.play(self.mixer, after=_on_mixer_err)
+                except Exception as play_err:
+                    print(f"[DiscordService] Initial mixer play notice: {play_err}")
 
             # Attempt to set distinguishable bot nickname in guild if configured
             bot_display_name = os.environ.get('BOT_NAME') or (f"Soundboard ({os.environ.get('USER_NAME').title()})" if os.environ.get('USER_NAME') else None)
@@ -466,8 +529,12 @@ class DiscordService:
             if not active_vc.is_playing():
                 print("[DiscordService] VoiceClient was not playing! Re-attaching mixer...")
                 def _on_mixer_err(err):
-                    print(f"[DiscordService] Mixer player stopped! Error: {err}")
-                active_vc.play(self.mixer, after=_on_mixer_err)
+                    if err:
+                        print(f"[DiscordService] Mixer player stopped! Error: {err}")
+                try:
+                    active_vc.play(self.mixer, after=_on_mixer_err)
+                except Exception as play_err:
+                    print(f"[DiscordService] Mixer play notice: {play_err}")
 
             # Resample to 48,000 Hz if needed (Discord standard sample rate)
             from scipy import signal
